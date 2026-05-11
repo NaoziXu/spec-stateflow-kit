@@ -1,0 +1,5 @@
+{
+  "action": "abort",
+  "reason": "task_already_complete",
+  "launch_claude_code": false
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "prompt": "User says: '586742 progress'. spec-env.json is configured, doc directory has 586742-remove-service-foundation-dependency with tasks.md containing 35 tasks, 13 marked [✓].",
+    "expected": "Agent should locate SPEC_PATH, read tasks.md, count markers via LLM parsing, write progress.json atomically, output: '进度已更新：13/35（37%），下一个 Task 14：{task_14_name}'"
+  },
+  {
+    "id": 2,
+    "prompt": "User says: 'Check all task progress'. doc directory has 4 spec directories with varying completion levels.",
+    "expected": "Agent should scan SPEC_DIR for all directories matching task IDs, read each tasks.md (or cached progress.json), output overview showing done/total and percentage for each spec"
+  },
+  {
+    "id": 3,
+    "prompt": "User says: 'How far is the service foundation task?'. doc directory has 586742-remove-service-foundation-dependency.",
+    "expected": "Agent should scan SPEC_DIR for directory names containing 'service' or 'foundation', fuzzy match to 586742-remove-service-foundation-dependency, then read tasks.md and output progress summary"
+  },
+  {
+    "id": 4,
+    "prompt": "User says: 'Progress'. ~/.agent/spec-env.json doesn't exist.",
+    "expected": "Agent should prompt 'Please install spec kit first', abort query operation"
+  },
+  {
+    "id": 5,
+    "prompt": "User says: '586742 progress'. tasks.md has 35 tasks, some [✓], some [ ], some [~].",
+    "expected": "Agent should locate SPEC_PATH, read tasks.md, LLM-parse top-level task markers, write progress.json, output concise summary: '进度已更新：{done}/{total}（{pct}%），下一个 Task {next_task}：{next_task_name}'"
+  },
+  {
+    "id": 6,
+    "prompt": "User says: '586742 进度查询'. spec-env.json is configured, doc directory has 586742-remove-service-foundation-dependency.",
+    "expected": "Agent should recognize 进度查询 as a progress trigger, locate SPEC_PATH, read tasks.md, LLM-parse markers, write progress.json, output concise progress summary in Chinese"
+  }
+]

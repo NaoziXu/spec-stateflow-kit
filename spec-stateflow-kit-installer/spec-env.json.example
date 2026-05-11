@@ -1,0 +1,5 @@
+{
+  "WORKSPACE": "/Users/yourname/Projects",
+  "DOC_DIR": "doc",
+  "CLAUDE_CLI": "/Users/yourname/.local/bin/claude"
+}

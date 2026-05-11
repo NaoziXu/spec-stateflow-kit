@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "prompt": "User says: 'Let Claude Code continue developing 586742'. spec-env.json configured with WORKSPACE=/Users/didi/MasProjects, DOC_DIR=doc, CLAUDE_CLI=/Users/didi/.local/bin/claude. Doc directory has 586742-remove-service-foundation-dependency, .project file contains mas-workflow, current progress 13/35.",
+    "expected": "Agent should: 1) read progress.json (invoke spec-task-progress skill to refresh if stale/missing) 2) locate spec directory + confirm project directory 3) generate prompt and show to user for confirmation ⛔ 4) after confirmation, launch Claude Code in background 5) report PID and log path"
+  },
+  {
+    "id": 2,
+    "prompt": "User says: 'Continue development'. No task ID specified. doc directory has 3 unfinished spec tasks.",
+    "expected": "Agent should scan SPEC_DIR for all spec directories, list unfinished tasks with progress summary, let user choose which one to drive, don't auto-select"
+  },
+  {
+    "id": 3,
+    "prompt": "User says: 'Keep going with 586742'. No .project file in spec directory, WORKSPACE has mas-workflow and doc directories.",
+    "expected": "Agent should list WORKSPACE directories for user to choose project directory, write project name to .project file after user confirmation. Then proceed with the rest of the driver flow."
+  },
+  {
+    "id": 4,
+    "prompt": "User says: 'Drive 586742'. spec-env.json doesn't exist.",
+    "expected": "Agent should prompt 'Please install spec kit first', abort operation"
+  },
+  {
+    "id": 5,
+    "prompt": "User says: 'Let Claude Code do Task 16-20 for 586742'. Current progress is at Task 15.",
+    "expected": "Agent should append 'Start from Task 16 and complete through Task 20' to the prompt, rest of flow unchanged"
+  }
+]

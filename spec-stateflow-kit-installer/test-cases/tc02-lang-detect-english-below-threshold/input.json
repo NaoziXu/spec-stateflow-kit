@@ -1,0 +1,4 @@
+{
+  "claude_md_content": "## Coding Style\n\nAlways create new objects, never mutate existing ones. Use immutable patterns throughout. Functions should be small (under 50 lines). Files should be focused (under 800 lines). No deep nesting beyond 4 levels.",
+  "request_phrase": "install spec kit"
+}

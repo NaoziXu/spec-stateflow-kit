@@ -1,0 +1,3 @@
+{
+  "claude_md_content": "# My Config\n\n## Coding Style\n\nAlways create new objects, never mutate existing ones. Use immutable patterns throughout."
+}

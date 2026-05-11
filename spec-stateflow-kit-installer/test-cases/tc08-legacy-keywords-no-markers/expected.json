@@ -1,0 +1,6 @@
+{
+  "marker_status": "none",
+  "legacy_keywords_found": true,
+  "keywords_detected": ["spec-stateflow", "SPEC_DIR", "Spec Workflow"],
+  "action": "prompt_legacy_removal"
+}

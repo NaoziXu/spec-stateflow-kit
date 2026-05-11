@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "prompt": "Monitor 586742",
+    "context": "spec-env.json configured, task 13/35 in progress, Claude Code available, no daemon running",
+    "expected": "A1: invoke spec-task-progress skill for 586742 + claude --version + monitor_daemon.py 586742 status (not running) → ⛔ confirm → A2: ls doc/*586742* + cat .project + git status → ⛔ confirm → A3: nohup start daemon + sleep 2 + verify status shows running → A4: report PID/PGID/log paths"
+  },
+  {
+    "id": 2,
+    "prompt": "Monitor 586742",
+    "context": "monitor_daemon.py 586742 status shows daemon already running (PID file alive)",
+    "expected": "Pre-check detects running daemon via status command → inform 'Monitoring already running for 586742', abort"
+  },
+  {
+    "id": 3,
+    "prompt": "Stop monitoring 586742",
+    "context": "Daemon running for 586742",
+    "expected": "Run 'monitor_daemon.py 586742 stop' → killpg terminates daemon+worker → pid/pgid/lock files removed → inform user 'Monitor 586742 stopped'"
+  },
+  {
+    "id": 4,
+    "prompt": "Restart monitoring 586742",
+    "context": "Daemon running but suspected stalled",
+    "expected": "Run 'monitor_daemon.py 586742 restart' → stops existing daemon → starts new one → sleep 2 → verify alive → show new PID"
+  },
+  {
+    "id": 5,
+    "prompt": "Check monitor status",
+    "context": "Two monitors may be running: 586742 and 586040",
+    "expected": "Scan /tmp/claude-monitor-*.pid → for each ID: run monitor_daemon.py <id> status → display daemon alive/dead, progress, restart count, worker status"
+  },
+  {
+    "id": 6,
+    "prompt": "Test monitor scripts",
+    "context": "Post-install verification",
+    "expected": "Run 'monitor_daemon.py _testonly_ test' → show full output → interpret ALL PASSED or list [FAIL] lines → if failed: suggest fix (spec-env.json misconfigured / /tmp not writable / Python fcntl unavailable)"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "prompt_contains": [
+    "Stop and wait for my review",
+    "uncommitted changes"
+  ],
+  "prompt_not_contains": [
+    "continuous mode",
+    "autonomously"
+  ]
+}
