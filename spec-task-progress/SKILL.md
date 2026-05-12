@@ -1,6 +1,6 @@
 ---
 name: spec-task-progress
-description: "Query spec task execution progress and write progress.json. Triggers: check task progress, task status, task progress, progress, 查询进度, 任务状态, 任务进度, 进度查询, 查看进度, 帮我看一下spec任务的开发进度. Used when user or daemon wants to know how far a spec task has progressed."
+description: "Query spec task execution progress and write progress.json. Triggers: check task progress, task status, task progress, progress, check spec task progress. Used when user or daemon wants to know how far a spec task has progressed."
 alwaysApply: false
 ---
 
@@ -18,17 +18,17 @@ This skill handles two trigger formats:
 
 **User / manual trigger:**
 ```
-任务状态 586742
+task progress 586742
 check task progress 586742
 ```
 
 **Scene 3 (daemon trigger — no monitoring context):**
 ```
-帮我看一下spec任务的开发进度
-需求编号：{task_id}
+Check spec task progress
+task_id:{task_id}
 ```
 
-When triggered via Scene 3, extract `task_id` from the `需求编号：` line and proceed directly to the progress query flow. Do not add monitoring context or restart suggestions to the output.
+When triggered via Scene 3, extract `task_id` from the `task_id:` line and proceed directly to the progress query flow. Do not add monitoring context or restart suggestions to the output.
 
 ## Environment & Path Resolution
 
@@ -102,10 +102,10 @@ Count tasks by scanning **only top-level list items** (lines starting with `- [m
 
 **Do not count markers that appear inside task content** (Scope, Specifics, Notes fields). Only the leading marker of a top-level list item counts.
 
-**双层一致性：** tasks.md 采用双层结构时（Overview 列表 + `### Task N:` 表格），两层的状态标记可能不一致。解析规则：
-- **计数层（Overview 列表）** 是 spec-task-progress 的计数依据——LLM 扫描 Overview 列表中的 `- [marker]` 行
-- **权威层（表格 Status 字段）** 是任务状态的权威来源——不一致时以表格 Status 字段为准
-- LLM 计数时以 Overview 列表的标记为准，但若发现两层不一致，应在输出中注明
+**Dual-layer consistency:** When tasks.md uses a dual-layer format (Overview list + `### Task N:` tables), the two layers may have inconsistent status markers. Parsing rules:
+- **Counting layer (Overview list)** is the basis for spec-task-progress counts — the LLM scans `- [marker]` lines in the Overview list
+- **Authoritative layer (table Status field)** is the authoritative source of task state — when inconsistent, the table Status field takes precedence
+- When counting, use the Overview list markers, but note any inconsistencies in the output
 
 ## progress.json Schema
 
@@ -118,7 +118,7 @@ Write exactly these 8 fields. Preserve `project_name` from the existing file if 
   "done": 4,
   "total": 10,
   "next_task": 5,
-  "next_task_name": "实现认证逻辑",
+  "next_task_name": "Implement auth logic",
   "is_complete": false,
   "updated_at": "2024-01-15T10:30:00"
 }
@@ -144,17 +144,17 @@ Write exactly these 8 fields. Preserve `project_name` from the existing file if 
 After writing progress.json, output a brief summary:
 
 ```
-进度已更新：{done}/{total}（{pct}%），下一个 Task {next_task}：{next_task_name}
+Progress updated: {done}/{total} ({pct}%), next: Task {next_task}: {next_task_name}
 ```
 
 If already fresh (cache hit):
 ```
-进度（缓存）：{done}/{total}（{pct}%），下一个 Task {next_task}：{next_task_name}
+Progress (cached): {done}/{total} ({pct}%), next: Task {next_task}: {next_task_name}
 ```
 
 If all complete:
 ```
-进度已更新：{total}/{total}（100%），全部完成 ✓
+Progress updated: {total}/{total} (100%), all tasks complete ✓
 ```
 
 ## Exception Handling
@@ -183,7 +183,7 @@ If all complete:
 
 ## Testing
 
-When user inputs `测试 spec-task-progress` or `test spec-task-progress`:
+When user inputs `test spec-task-progress`:
 
 1. Locate `test-cases/` directory relative to this SKILL.md
 2. For each subdirectory (tc01, tc02, …) in order:
@@ -197,7 +197,7 @@ When user inputs `测试 spec-task-progress` or `test spec-task-progress`:
 
 **Example test run output:**
 ```
-spec-task-progress 测试结果：
+spec-task-progress test results:
 
 tc01-mixed-status        PASS
 tc02-all-complete        PASS

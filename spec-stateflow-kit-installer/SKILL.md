@@ -1,6 +1,6 @@
 ---
 name: spec-stateflow-kit-installer
-description: "Install or uninstall the Spec Stateflow Kit. Triggers: install spec kit, uninstall spec, spec-stateflow-kit-installer, initialize spec, remove spec, 安装spec, 卸载spec, 初始化spec, test installer, 测试 installer, test spec-installer, verify installer. Manages skills, spec-env.json, hook scripts (spec-stop-anchor.sh, spec-state-guard.sh), spec-router, and settings.json allowedTools."
+description: "Install or uninstall the Spec Stateflow Kit. Triggers: install spec kit, uninstall spec, spec-stateflow-kit-installer, initialize spec, remove spec, test installer, test spec-installer, verify installer. Manages skills, spec-env.json, hook scripts (spec-stop-anchor.sh, spec-state-guard.sh), spec-router, and settings.json allowedTools."
 alwaysApply: false
 ---
 
@@ -62,9 +62,9 @@ Use the user's answer to infer the path. Expand `~` and verify the directory exi
 
 | User Input | Mode |
 |-----------|------|
-| "install spec" / "install spec kit" / "initialize spec" / "安装spec" / "初始化spec" | → **Install** |
-| "uninstall spec" / "remove spec" / "卸载spec" | → **Uninstall** |
-| "test installer" / "测试 installer" / "test spec-installer" | → **Self-Test** |
+| "install spec" / "install spec kit" / "initialize spec" | → **Install** |
+| "uninstall spec" / "remove spec" | → **Uninstall** |
+| "test installer" / "test spec-installer" | → **Self-Test** |
 | No specific mode | → Ask user: "Install or uninstall?" |
 
 ---
@@ -270,11 +270,11 @@ Failure → warn, continue.
 
 **Report:**
 ```
-安装校验结果：
-✅ 路径对齐：spec-env.json 路径推导正确
-✅ 环境加载：spec-env.json 可被技能加载，SPEC_DIR 存在
-✅ CLAUDE_CLI：{version}
-✅ WORKSPACE：存在
+Installation validation results:
+✅ Path alignment: spec-env.json path derivation correct
+✅ Environment load: spec-env.json loadable by skills, SPEC_DIR exists
+✅ CLAUDE_CLI: {version}
+✅ WORKSPACE: exists
 ```
 
 ### Step 5: Install Claude Code Skills
@@ -677,7 +677,7 @@ If any file cannot be removed, warn and continue:
 
 ## Testing
 
-When user inputs `test installer`, `测试 installer`, or `test spec-installer`:
+When user inputs `test installer` or `test spec-installer`:
 
 > **Scope**: Tests the installer's decision logic using fixture data. Does **not** write any files, copy any skills, or touch any config — purely logic verification. Safe to run at any time.
 
@@ -698,7 +698,7 @@ When user inputs `test installer`, `测试 installer`, or `test spec-installer`:
 
 **Example test run output:**
 ```
-spec-installer 测试结果：
+spec-installer test results:
 
 tc01-lang-detect-cjk-above-threshold     PASS
 tc02-lang-detect-english-below-threshold PASS

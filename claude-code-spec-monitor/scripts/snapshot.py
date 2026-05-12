@@ -267,7 +267,7 @@ def kill_progress_checker(progress_checker_pid: int) -> None:
 
 
 def spawn_progress_checker(task_id: str, claude_cli: str, project_dir: str) -> int:
-    prompt = f"帮我看一下spec任务的开发进度\n需求编号：{task_id}"
+    prompt = f"Check spec task progress\ntask_id:{task_id}"
     proc = subprocess.Popen(
         [claude_cli, "-p", prompt, "--dangerously-skip-permissions"],
         cwd=project_dir,

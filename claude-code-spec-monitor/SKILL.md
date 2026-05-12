@@ -1,6 +1,6 @@
 ---
 name: claude-code-spec-monitor
-description: "Monitor Claude Code for continuous spec task execution. Progress check every 15 min, auto-stop on completion. Triggers: monitor claude code, watch progress, guard claude code, watch dog, claude code guard, test monitor, verify monitor, monitor test, restart monitor, 监控, 看守, 守护, 看门狗, 测试monitor, 重启监控. Used when user is away from computer and needs continuous monitoring of spec task execution, or wants to verify monitor scripts are working correctly."
+description: "Monitor Claude Code for continuous spec task execution. Progress check every 15 min, auto-stop on completion. Triggers: monitor claude code, watch progress, guard claude code, watch dog, claude code guard, test monitor, verify monitor, monitor test, restart monitor. Used when user is away from computer and needs continuous monitoring of spec task execution, or wants to verify monitor scripts are working correctly."
 alwaysApply: false
 ---
 
@@ -46,7 +46,7 @@ Paths are read from `{SKILLS_DIR}/../spec-env.json`:
 | "stop monitor" / "stop watching" + task ID | → Operation B: Stop Monitoring |
 | "restart monitor" + task ID | → Operation C: Restart Monitoring |
 | "monitor status" / "monitor state" | → Operation D: View Status |
-| "test monitor" / "verify monitor" / "测试monitor" | → Operation E: Self-Test |
+| "test monitor" / "verify monitor" | → Operation E: Self-Test |
 
 ## Operations
 
@@ -120,7 +120,7 @@ tail -20 {SPEC_PATH}/daemon.log
    - Both paths: scans running processes for worker activity and saves state
 
 **Progress checker lifecycle:**
-- Spawned each cycle via: `claude -p "帮我看一下spec任务的开发进度\n需求编号:{task_id}" --dangerously-skip-permissions`
+- Spawned each cycle via: `claude -p "Check spec task progress\ntask_id:{task_id}" --dangerously-skip-permissions`
 - Runs in project directory; parses tasks.md and writes progress.json
 - Previous cycle's checker is killed before new one is spawned
 - PID tracked in `{SPEC_PATH}/monitor-state.json` as `checker_pid` field (written by `snapshot.py cycle`)

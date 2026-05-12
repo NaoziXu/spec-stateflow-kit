@@ -1,6 +1,6 @@
 ---
 name: spec-stateflow
-description: "Structured software engineering workflow with state-driven execution: requirement analysis → technical design → task planning → execution with state navigation and session recovery. Triggers: new feature, complex architecture, multi-module integration, database/UI design, or any task requiring structured planning and execution. Trigger words: new feature, architecture design, requirement implementation, spec workflow, state recovery, task tracking, 新功能, 复杂架构, 多模块, 需求实现, spec工作流, 状态恢复, 任务追踪"
+description: "Structured software engineering workflow with state-driven execution: requirement analysis → technical design → task planning → execution with state navigation and session recovery. Triggers: new feature, complex architecture, multi-module integration, database/UI design, or any task requiring structured planning and execution. Trigger words: new feature, architecture design, requirement implementation, spec workflow, state recovery, task tracking"
 alwaysApply: false
 ---
 
@@ -172,17 +172,17 @@ Every task in `{SPEC_PATH}/tasks.md` must contain the following fields:
 
 **Critical field — Specifics:** Must be precise down to method/field level. After session compression, recovery depends entirely on this field to reconstruct what was done and what remains.
 
-### Affected 字段：依赖影响参考
+### Affected Field: Dependency Impact Reference
 
-填写 Affected 字段时，重点识别以下 5 类连带影响：
+When filling in the Affected field, focus on identifying these 5 categories of downstream impact:
 
-| 影响类型 | 描述 | 示例 |
-|---------|------|------|
-| **API/接口变更** | 新增、修改或删除接口方法 | 调用方需更新方法签名、返回值类型 |
-| **模块依赖** | 跨模块数据流或调用链改变 | Service A 调用 Service B 的新方法 |
-| **数据模型** | 数据库表结构或 DTO 字段变化 | 新增字段需同步 ORM 映射和 DTO |
-| **配置项** | 环境变量、配置文件或常量变化 | 新配置项需在 spec-env.json 和文档中声明 |
-| **接口契约** | 对外暴露的 API 格式或行为约定变化 | 调用方（客户端/前端/外部系统）需同步更新 |
+| Impact Type | Description | Example |
+|-------------|-------------|---------|
+| **API / Interface Change** | Adding, modifying, or removing interface methods | Callers must update method signatures and return types |
+| **Module Dependency** | Cross-module data flow or call-chain changes | Service A calls a new method on Service B |
+| **Data Model** | Database schema or DTO field changes | New fields require syncing ORM mappings and DTOs |
+| **Config Entry** | Environment variable, config file, or constant changes | New config entries must be declared in spec-env.json and docs |
+| **Interface Contract** | Changes to externally exposed API format or behavior | Callers (clients / frontend / external systems) must update accordingly |
 
 **Status values:**
 - `[ ]` — Not started
@@ -237,11 +237,11 @@ Tasks use a **dual-layer format**: an Overview list for machine parsing + `### T
 
 ### Machine Parsing Contract
 
-生成或更新 `tasks.md` 时，任务状态标记仅允许使用 `[ ]` `[~]` `[✓]` `[⏭]` 四种形式，禁止使用任何 emoji 或其他字符替代。
+When generating or updating `tasks.md`, task status markers must use only the four forms `[ ]` `[~]` `[✓]` `[⏭]`. No emoji or other characters may be substituted.
 
-**双层同步规则：** Overview 列表中的状态标记与对应 `### Task N:` 表格中的 Status 字段必须保持一致。更新任务状态时，两处必须同步修改——先改 Overview 标记，再改表格 Status 字段（或同时修改）。不一致时，以 `### Task N:` 表格中的 Status 字段为权威值。
+**Dual-layer sync rule:** The status marker in the Overview list and the Status field in the corresponding `### Task N:` table must remain consistent. When updating task status, both locations must be changed together — update the Overview marker first, then the table Status field (or both simultaneously). When inconsistent, the `### Task N:` table Status field is the authoritative value.
 
-> 注：格式约束仅限于能有效控制的范围——状态标记字符。其他格式细节（行结构、子字段格式等）由 spec-task-progress 的 LLM 解析能力兜底，不在此契约中强制。
+> Note: Format constraints apply only to what can be reliably enforced — the status marker characters. Other format details (line structure, sub-field format, etc.) are handled by spec-task-progress's LLM parsing capability and are not enforced in this contract.
 
 ---
 

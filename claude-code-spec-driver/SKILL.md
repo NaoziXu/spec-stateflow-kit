@@ -1,6 +1,6 @@
 ---
 name: claude-code-spec-driver
-description: "Generate Claude Code prompts based on spec task progress to drive continued development. Triggers: let claude code continue development, continue task execution, drive development, spec driver, keep going, continue working, 让Claude Code继续, 继续执行任务, 驱动开发, 继续开发, 往下做, test spec-driver, 测试 spec-driver, verify driver. Used when user wants Claude Code to continue development based on spec documents, or wants to verify driver logic is working correctly."
+description: "Generate Claude Code prompts based on spec task progress to drive continued development. Triggers: let claude code continue development, continue task execution, drive development, spec driver, keep going, continue working, test spec-driver, verify driver. Used when user wants Claude Code to continue development based on spec documents, or wants to verify driver logic is working correctly."
 alwaysApply: false
 ---
 
@@ -58,9 +58,9 @@ Abort on any failure, inform user.
 | Specifies task range (e.g. "do Task 16-20") | -> Limited range drive | Standard |
 | No specific task | -> Query overview, let user choose | Standard |
 | "how's the progress" / "where is it at" | -> Only query progress, don't start Claude Code | -- |
-| "test spec-driver" / "测试 spec-driver" | -> Self-Test | -- |
+| "test spec-driver" | -> Self-Test | -- |
 
-> **Mode override:** If the user explicitly says phrases like `"you may continue implementing"`, `"complete the rest without asking"`, `"continuous mode"`, `"keep going without asking"`, `"用连续模式"`, `"连续执行"`, `"不用等我确认"`, or `"一口气跑完"`, switch to **Continuous Operation Mode** for this drive. Ambiguous confirmations (`OK` / `continue` / `okay` / `继续` / `好`) do **not** activate Continuous Mode.
+> **Mode override:** If the user explicitly says phrases like `"you may continue implementing"`, `"complete the rest without asking"`, `"continuous mode"`, or `"keep going without asking"`, switch to **Continuous Operation Mode** for this drive. Ambiguous confirmations (`OK` / `continue` / `okay`) do **not** activate Continuous Mode.
 
 ## Execution Flow
 
@@ -75,11 +75,11 @@ Abort on any failure, inform user.
 
 ### Step 1: Query Progress
 
-Read `{SPEC_PATH}/progress.json`. If the file is missing or `updated_at` is older than 15 minutes, trigger the `spec-task-progress` skill by sending the prompt `{task_id} 进度查询` — wait for it to write a fresh `progress.json` before continuing.
+Read `{SPEC_PATH}/progress.json`. If the file is missing or `updated_at` is older than 15 minutes, trigger the `spec-task-progress` skill by sending the prompt `{task_id} progress query` — wait for it to write a fresh `progress.json` before continuing.
 
 Check the returned data:
 
-- **`is_complete: true`** → Inform user "任务 {task_id} 已全部完成，无需继续执行。" and **abort** (do not launch Claude Code).
+- **`is_complete: true`** → Inform user "Task {task_id} is already complete. No further execution needed." and **abort** (do not launch Claude Code).
 - **`is_complete: false`** → Continue.
 
 **When no task ID is provided** (routing: "No specific task" or "continue development"):
@@ -144,7 +144,7 @@ Workspace status check:
 
 **3.3 Prompt templates**
 
-> **Language note**: Prompt templates are intentionally in English — Claude Code performs best with English prompts regardless of the user's interface language. Trigger phrases and user-facing messages are bilingual (see description triggers above).
+> **Language note**: Prompt templates are intentionally in English — Claude Code performs best with English prompts regardless of the user's interface language.
 
 **Standard Mode (default):**
 
@@ -208,7 +208,7 @@ After launch, proactively report to user:
 2. How to check progress
 
 ```bash
-# View output (CJK characters may be garbled, look for key info)
+# View output
 tail -50 {SPEC_PATH}/worker.log
 
 # Check if matching claude processes exist
@@ -229,7 +229,7 @@ To query the latest progress, invoke the `spec-task-progress` skill with the tas
 | Spec directory doesn't exist for task ID | List all directories under doc for user to choose |
 | Multiple directories match same ID | List all matches for user to choose |
 | Invalid/non-existent task ID | Inform user, run full overview for selection |
-| progress.json is_complete=true | Inform user "任务已全部完成，无需继续执行", abort |
+| progress.json is_complete=true | Inform user "Task is already complete. No further execution needed.", abort |
 | Claude Code not installed / CLAUDE_CLI path invalid | Run `{CLAUDE_CLI} --version`, inform user to install first or fix spec-env.json |
 | Claude Code process exits immediately | Check logs, common causes: auth expired, model unavailable |
 | Compilation failure | Claude Code will handle itself, inform user if it keeps failing |
@@ -264,7 +264,7 @@ cd {WORKSPACE}/{project_name} && git log --oneline -5
 
 ## Testing
 
-When user inputs `test spec-driver` or `测试 spec-driver`:
+When user inputs `test spec-driver`:
 
 > **Scope**: Tests the driver's decision logic using fixture data. No files are written, no Claude Code is launched — purely logic verification.
 
@@ -289,7 +289,7 @@ For prompt assembly tests (tc12), `prompt_contains` and `prompt_not_contains` ar
 
 **Example test run output:**
 ```
-spec-driver 测试结果：
+spec-driver test results:
 
 tc01-route-single-task            PASS
 tc02-route-no-task                PASS
