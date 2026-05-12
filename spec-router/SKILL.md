@@ -62,6 +62,20 @@ User Input
 
 ## Step 0: Session Context Recovery
 
+`~/.claude/spec-session.json` fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `task_id` | string | Active spec ID, e.g. `SPEC-00042` |
+| `is_complete` | bool | True if spec finished |
+| `updated_at` | ISO-8601 string | Timestamp of last session stop |
+| `spec_path` | string | Absolute path to spec directory |
+| `active_task_num` | int | Current task number |
+| `active_task_name` | string | Current task name |
+| `active_task_scope` | string | Task scope summary |
+| `active_task_specifics` | string | Task specifics detail |
+| `git_head` | string | Short SHA recorded at session stop |
+
 When user says "continue" / "resume", execute Step 0 before invoking spec-stateflow Compression Recovery:
 
 ```
