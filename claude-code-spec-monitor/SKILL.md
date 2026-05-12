@@ -32,8 +32,8 @@ Paths are read from `{SKILLS_DIR}/../spec-env.json`:
 | Daemon state | `{SPEC_PATH}/monitor-state.json` | Daemon runtime state (git head, log size, last check time, checker PID) |
 | Worker log | `{SPEC_PATH}/worker.log` | Claude Code stdout/stderr |
 | Daemon log | `{SPEC_PATH}/daemon.log` | Daemon stdout/stderr (nohup redirect) |
-| Daemon PID | `/tmp/claude-monitor-<task_id>.pid` | Process control only |
-| Lock | `/tmp/claude-monitor-<task_id>.lock` | flock double-start prevention |
+| Daemon PID | `{SPEC_PATH}/daemon.pid` | Process control only (falls back to `/tmp` for unknown task IDs) |
+| Lock | `{SPEC_PATH}/daemon.lock` | flock double-start prevention (falls back to `/tmp` for unknown task IDs) |
 
 **Check interval: 15 min.** Worker processes identified by task_id pattern in command line — no PID files needed.
 
@@ -111,11 +111,11 @@ tail -20 {SPEC_PATH}/daemon.log
 ```
 
 **Daemon internals (runs autonomously, no agent involvement):**
-1. `snapshot.py init` → initializes `/tmp/claude-monitor-<task_id>.json` state file
+1. `snapshot.py init` → initializes `{SPEC_PATH}/monitor-state.json` state file
 2. Loop every 15 min: `snapshot.py cycle` → handles everything:
    - Reads `progress.json` (written by LLM progress checker via spec-task-progress skill)
    - **Fresh + is_complete=true** → prints `ACTION: STOP` → daemon exits cleanly
-   - **Fresh + in-progress** → kills old progress checker → spawns new one → writes checker.json
+   - **Fresh + in-progress** → kills old progress checker → spawns new one → updates `monitor-state.json`
    - **Degraded (missing or stale progress.json)** → kills old progress checker → spawns new one → logs git/log activity signals → no STOP triggered
    - Both paths: scans running processes for worker activity and saves state
 
@@ -123,7 +123,7 @@ tail -20 {SPEC_PATH}/daemon.log
 - Spawned each cycle via: `claude -p "帮我看一下spec任务的开发进度\n需求编号:{task_id}" --dangerously-skip-permissions`
 - Runs in project directory; parses tasks.md and writes progress.json
 - Previous cycle's checker is killed before new one is spawned
-- PID tracked in `{SPEC_PATH}/checker.json` (written by daemon)
+- PID tracked in `{SPEC_PATH}/monitor-state.json` as `checker_pid` field (written by `snapshot.py cycle`)
 
 **Worker identification:** `ps` scan for `claude` processes whose command line contains `task_id`. No PID file needed. Workers are identified and counted but not restarted by the daemon — the progress checker drives forward progress.
 
@@ -133,7 +133,7 @@ tail -20 {SPEC_PATH}/daemon.log
 |--------|-----------------|
 | Git commits | Compare `git rev-parse HEAD` |
 | Git working tree | `git status --short` |
-| Log file growth | Compare `/tmp/claude-spec-<task_id>.log` file size |
+| Log file growth | Compare `{SPEC_PATH}/worker.log` file size |
 
 #### A4. Report to User
 
@@ -176,10 +176,14 @@ Use when daemon is stalled or after manually fixing a workspace issue.
 # Single task
 python3 {SKILLS_DIR}/claude-code-spec-monitor/scripts/monitor_daemon.py {task_id} status
 
-# All active monitors
-ls /tmp/claude-monitor-*.pid 2>/dev/null | while read f; do
-  id=$(echo $f | sed 's|.*claude-monitor-\(.*\)\.pid|\1|')
-  python3 {SKILLS_DIR}/claude-code-spec-monitor/scripts/monitor_daemon.py $id status
+# All active monitors (scan SPEC_DIR for daemon.pid files; fall back to /tmp for legacy/test-only)
+SPEC_ENV="{SKILLS_DIR}/../spec-env.json"
+WORKSPACE=$(python3 -c "import json,sys; e=json.load(open(sys.argv[1])); print(e.get('WORKSPACE',''))" "$SPEC_ENV" 2>/dev/null)
+DOC_DIR=$(python3 -c "import json,sys; e=json.load(open(sys.argv[1])); print(e.get('DOC_DIR','doc'))" "$SPEC_ENV" 2>/dev/null)
+for pid_file in "${WORKSPACE}/${DOC_DIR}"/*/daemon.pid /tmp/claude-monitor-*.pid; do
+  [ -f "$pid_file" ] || continue
+  id=$(basename "$(dirname "$pid_file")")
+  python3 {SKILLS_DIR}/claude-code-spec-monitor/scripts/monitor_daemon.py "$id" status
   echo "---"
 done
 ```
@@ -220,8 +224,8 @@ Runs 8 test phases: environment checks → pre-test cleanup → status(no daemon
 ## ⚠️ Do Not Run `snapshot.py stop` While Daemon Is Running
 
 `snapshot.py stop` kills all matching processes and deletes two files:
-- `/tmp/claude-monitor-<task_id>.json` (daemon state — baseline values lost)
-- `/tmp/claude-spec-<task_id>.log` (worker log — debugging history lost)
+- `{SPEC_PATH}/monitor-state.json` (daemon state — baseline values lost)
+- `{SPEC_PATH}/worker.log` (worker log — debugging history lost)
 
 Running it while the daemon is active causes:
 1. Worker killed directly → progress checker also killed

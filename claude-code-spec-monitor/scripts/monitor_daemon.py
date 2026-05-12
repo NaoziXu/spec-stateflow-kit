@@ -3,8 +3,8 @@
 Claude Code Monitor Daemon
 
 File protocol:
-  /tmp/claude-monitor-{id}.pid       <- daemon PID (process control only)
-  /tmp/claude-monitor-{id}.lock      <- flock (double-start prevention)
+  {SPEC_PATH}/daemon.pid             <- daemon PID (process control only; /tmp fallback for unknown task IDs)
+  {SPEC_PATH}/daemon.lock            <- flock (double-start prevention; /tmp fallback for unknown task IDs)
   {SPEC_PATH}/monitor-state.json     <- daemon runtime state + checker PID (managed by snapshot.py)
   {SPEC_PATH}/worker.log             <- Claude Code worker output
   {SPEC_PATH}/daemon.log             <- this daemon's stdout/stderr (nohup redirect)
@@ -51,25 +51,27 @@ def _resolve_spec_path(task_id: str):
 
 
 def paths(task_id: str, spec_path=None):
-    """Return file paths. pid/lock are always in /tmp; data/log files live in SPEC_PATH.
-    Falls back to /tmp when spec_path cannot be resolved (e.g. test task IDs).
+    """Return file paths. All files live in SPEC_PATH when resolvable.
+    Falls back to /tmp for unknown task IDs (e.g. self-test with _testonly_).
     """
     if spec_path is None:
         spec_path = _resolve_spec_path(task_id)
 
-    p = {
-        'pid':  f'/tmp/claude-monitor-{task_id}.pid',
-        'lock': f'/tmp/claude-monitor-{task_id}.lock',
-    }
     if spec_path:
-        p['state']      = os.path.join(spec_path, 'monitor-state.json')
-        p['log']        = os.path.join(spec_path, 'worker.log')
-        p['daemon_log'] = os.path.join(spec_path, 'daemon.log')
-    else:
-        p['state']      = f'/tmp/claude-monitor-{task_id}.json'
-        p['log']        = f'/tmp/claude-spec-{task_id}.log'
-        p['daemon_log'] = f'/tmp/claude-monitor-{task_id}-daemon.log'
-    return p
+        return {
+            'pid':        os.path.join(spec_path, 'daemon.pid'),
+            'lock':       os.path.join(spec_path, 'daemon.lock'),
+            'state':      os.path.join(spec_path, 'monitor-state.json'),
+            'log':        os.path.join(spec_path, 'worker.log'),
+            'daemon_log': os.path.join(spec_path, 'daemon.log'),
+        }
+    return {
+        'pid':        f'/tmp/claude-monitor-{task_id}.pid',
+        'lock':       f'/tmp/claude-monitor-{task_id}.lock',
+        'state':      f'/tmp/claude-monitor-{task_id}.json',
+        'log':        f'/tmp/claude-spec-{task_id}.log',
+        'daemon_log': f'/tmp/claude-monitor-{task_id}-daemon.log',
+    }
 
 
 # ---------------------------------------------------------------------------

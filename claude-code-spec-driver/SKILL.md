@@ -178,7 +178,6 @@ I have previously generated documents through spec-stateflow. Please continue de
 ```bash
 cd {PROJECT_DIR} && nohup {CLAUDE_CLI} \
   -p "{Step 3 generated prompt}" \
-  --dangerously-skip-permissions \
   >> {SPEC_PATH}/worker.log 2>&1 &
 echo "Launched. Log: {SPEC_PATH}/worker.log"
 ```
@@ -189,7 +188,6 @@ Where `{PROJECT_DIR}` and `{CLAUDE_CLI}` are dynamically obtained from spec-env.
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `--dangerously-skip-permissions` | Skip permission confirmation | Required, otherwise non-interactive mode gets stuck |
 | `--max-turns` | Maximum turns | Optional, unlimited if not set |
 
 **Can also use launch_claude_spec.sh script:**
@@ -201,7 +199,7 @@ Where `{PROJECT_DIR}` and `{CLAUDE_CLI}` are dynamically obtained from spec-env.
   --prompt "{prompt}"
 ```
 
-> **Note:** When used together with `claude-code-spec-monitor`, both use the same fixed log file `/tmp/claude-spec-{task_id}.log` in append mode. The monitor detects log growth to determine if the process is active.
+> **Note:** When used together with `claude-code-spec-monitor`, both use the same log file `{SPEC_PATH}/worker.log` in append mode. The monitor detects log growth to determine if the process is active.
 
 ### Step 5: Monitor Progress
 
@@ -256,7 +254,6 @@ cd {WORKSPACE}/{project_name} && git status --short
 # Step 4: Launch
 cd {WORKSPACE}/{project_name} && nohup {CLAUDE_CLI} \
   -p "I have previously generated documents through spec-stateflow..." \
-  --dangerously-skip-permissions \
   >> {SPEC_PATH}/worker.log 2>&1 &
 
 # Step 5: Report log path + progress

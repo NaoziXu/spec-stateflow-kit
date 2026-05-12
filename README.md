@@ -42,22 +42,28 @@ The core insight: **the task tracker (`tasks.md`) is the single source of truth*
 spec-stateflow-kit/
 ├── spec-stateflow-kit-installer/    ← Installer (deploys everything)
 │   ├── SKILL.md                     ← Install / Uninstall logic
-│   ├── claude-sample.md             ← CLAUDE.md template (decision rules)
-│   ├── claude-reference-sample.md   ← CLAUDE-reference.md template (detail reference)
 │   ├── spec-env.json.example        ← Environment config template
-│   └── test-prompts.json            ← 10 test scenarios
+│   ├── test-cases/                  ← Logic test fixtures (language/marker detection)
+│   ├── test-prompts.json
+│   └── scripts/
+│       ├── spec-stop-anchor.sh      ← Stop Hook script
+│       └── spec-state-guard.sh      ← PostToolUse Hook script
 │
 ├── spec-stateflow/                  ← Core workflow engine (runs inside Claude Code)
 │   ├── SKILL.md                     ← 4-phase workflow + state machine
 │   └── test-prompts.json
 │
-├── spec-task-progress/              ← Progress query (runs inside your Claw Agent)
+├── spec-router/                     ← Always-active routing (runs inside Claude Code)
+│   └── SKILL.md                     ← Task classification + command routing + session recovery
+│
+├── spec-task-progress/              ← Progress query (runs inside Claw Agent + Claude Code)
 │   ├── SKILL.md
 │   ├── test-cases/                  ← LLM parse test fixtures
 │   └── test-prompts.json
 │
 ├── claude-code-spec-driver/         ← Drive Claude Code to continue dev
 │   ├── SKILL.md
+│   ├── test-cases/                  ← Decision logic test fixtures
 │   ├── scripts/launch_claude_spec.sh
 │   └── test-prompts.json
 │
@@ -73,20 +79,21 @@ spec-stateflow-kit/
 ### Deployment Topology
 
 ```
-┌─────────────────────────────────┐     ┌──────────────────────────────┐
-│        Claw Agent Side          │     │       Claude Code Side       │
-│                                 │     │                              │
-│  {SKILLS_DIR}/                  │     │  ~/.claude/                  │
-│    spec-stateflow-kit-installer │     │    CLAUDE.md                 │
-│    spec-task-progress           │     │    CLAUDE-reference.md       │
-│    claude-code-spec-driver      │     │    skills/spec-stateflow/    │
-│    claude-code-spec-monitor     │     │    skills/spec-task-progress/│
-│                                 │     │                              │
-│  {SKILLS_DIR}/../spec-env.json  │     │                              │
-└─────────────────────────────────┘     └──────────────────────────────┘
+┌─────────────────────────────────┐     ┌──────────────────────────────────┐
+│        Claw Agent Side          │     │        Claude Code Side          │
+│                                 │     │                                  │
+│  {SKILLS_DIR}/                  │     │  ~/.claude/                      │
+│    spec-stateflow-kit-installer │     │    spec-env.json                 │
+│    spec-task-progress           │     │    settings.json  (hooks)        │
+│    claude-code-spec-driver      │     │    skills/spec-stateflow/        │
+│    claude-code-spec-monitor     │     │    skills/spec-task-progress/    │
+│                                 │     │    skills/spec-router/           │
+│  {SKILLS_DIR}/../spec-env.json  │     │    scripts/spec-stop-anchor.sh   │
+└─────────────────────────────────┘     │    scripts/spec-state-guard.sh   │
+                                        └──────────────────────────────────┘
 ```
 
-The installer (`spec-stateflow-kit-installer`) manages the full lifecycle — copying skills, injecting CLAUDE.md content, writing config — so the user never touches paths manually.
+The installer (`spec-stateflow-kit-installer`) manages the full lifecycle — copying skills, writing config, installing hook scripts — so the user never touches paths manually.
 
 ---
 
@@ -160,10 +167,19 @@ Each task within `tasks.md` follows a strict lifecycle:
 ### spec-stateflow-kit-installer
 **Role:** Lifecycle manager
 **What it does:** Installs or uninstalls the entire kit in 2 modes:
-- **Install** (7 steps): Check Claude Code → Configure environment → Copy 4 Claw Agent skills → Validate paths → Inject CLAUDE.md + CLAUDE-reference.md (auto language detection) → Install spec-stateflow to Claude Code
-- **Uninstall** (8 steps): Confirm → Stop monitor processes → Remove all components including state files
+- **Install** (7 steps): Check Claude Code → Configure environment → Copy 4 Claw Agent skills → Validate paths → Install Claude Code skills (spec-stateflow + spec-task-progress + spec-router) → Install hook scripts → Configure settings.json
+- **Uninstall** (10 steps): Confirm → Stop monitor processes → Remove all components → Remove hook scripts → Remove settings.json entries → Cleanup
 
-**Key design:** Auto-detects CLAUDE.md language (CJK ratio > 0.3 → Chinese translation), 3-strategy removal for clean uninstall, full cleanup on uninstall (installer itself is also removed).
+**Key design:** Path alignment validation prevents misrouted env files, self-test verifies monitor scripts during install, full cleanup on uninstall (installer itself is also removed).
+
+### spec-router
+**Role:** Always-active routing layer (runs inside Claude Code)
+**What it does:** Loaded in every Claude Code session (`alwaysApply: true`). Provides three services:
+1. **Task classification** — maps user input to Complex / Fix / Simple / Routine and routes accordingly
+2. **Command routing** — handles `updatecode` / `continue` / `resume` / `check progress` without requiring the user to mention spec-stateflow
+3. **Step 0 session recovery** — reads `~/.claude/spec-session.json` on session start; if recent and incomplete, pre-loads context and routes directly to Compression Recovery Step 2
+
+**Key design:** Thin routing layer only — no workflow logic. Delegates immediately to `spec-stateflow` for all execution. Reads `~/.claude/spec-env.json` for path resolution.
 
 ### spec-task-progress
 **Role:** Progress query (LLM-based)
@@ -179,7 +195,7 @@ Each task within `tasks.md` follows a strict lifecycle:
 **What it does:** Generates prompts based on task progress and launches Claude Code in non-interactive background mode:
 1. Query progress → 2. Locate spec docs + confirm project → 3. Generate prompt (user confirms ⛔) → 4. Launch Claude Code → 5. Report PID + log path
 
-**Key design:** `.project` file mechanism for project directory persistence, workspace protection (uncommitted changes → append warning to prompt), `--dangerously-skip-permissions` for non-interactive execution.
+**Key design:** `project_name` field in `progress.json` for project directory persistence, workspace protection (uncommitted changes → append warning to prompt), worktree isolation support (configurable via `spec-env.json`).
 
 ### claude-code-spec-monitor
 **Role:** Autonomous monitoring guard
@@ -192,7 +208,7 @@ Each task within `tasks.md` follows a strict lifecycle:
 - Degraded (stale/missing progress.json) → spawn checker, log git/log activity signals, no STOP
 - Worker processes identified by task_id pattern in `ps` output — no PID files needed
 
-**Key design:** Decoupled from spec-driver. Progress checker is a separate `claude -p` process (spec-task-progress skill). Daemon state in `/tmp/`, progress state in `{SPEC_PATH}/progress.json`, checker PID in `{SPEC_PATH}/checker.json`.
+**Key design:** Decoupled from spec-driver. Progress checker is a separate `claude -p` process (spec-task-progress skill). All runtime files co-located in `{SPEC_PATH}/` (`monitor-state.json`, `worker.log`, `daemon.pid`, `daemon.lock`); `/tmp` used only as fallback for test-only task IDs.
 
 ---
 

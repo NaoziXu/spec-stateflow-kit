@@ -454,19 +454,39 @@ User declines → abort.
 
 Stop all running monitor daemon instances **before** deleting any skill files.
 
+Daemon PID files now live in `{SPEC_PATH}/daemon.pid` (one per spec directory). Scan all spec directories, plus `/tmp` for any legacy or test-only fallback files.
+
 ```bash
-for pid_file in /tmp/claude-monitor-*.pid; do
-    [ -f "$pid_file" ] || continue
-    PID=$(cat "$pid_file" 2>/dev/null)
-    if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
-        kill "$PID" 2>/dev/null
-        sleep 1
-        kill -0 "$PID" 2>/dev/null && kill -9 "$PID" 2>/dev/null
-        echo "✅ Stopped monitor process $PID"
-    else
-        echo "⏭️  No active process for $pid_file, skipped"
-    fi
-done
+SPEC_ENV="{SKILLS_DIR}/../spec-env.json"
+if [ -f "$SPEC_ENV" ]; then
+    WORKSPACE=$(python3 -c "import json,sys; e=json.load(open(sys.argv[1])); print(e.get('WORKSPACE',''))" "$SPEC_ENV" 2>/dev/null)
+    DOC_DIR=$(python3 -c "import json,sys; e=json.load(open(sys.argv[1])); print(e.get('DOC_DIR','doc'))" "$SPEC_ENV" 2>/dev/null)
+    SPEC_DIR="${WORKSPACE}/${DOC_DIR}"
+    for pid_file in "${SPEC_DIR}"/*/daemon.pid /tmp/claude-monitor-*.pid; do
+        [ -f "$pid_file" ] || continue
+        PID=$(cat "$pid_file" 2>/dev/null)
+        if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+            kill "$PID" 2>/dev/null
+            sleep 1
+            kill -0 "$PID" 2>/dev/null && kill -9 "$PID" 2>/dev/null
+            echo "✅ Stopped monitor process $PID ($pid_file)"
+        else
+            echo "⏭️  No active process for $pid_file, skipped"
+        fi
+    done
+else
+    echo "⚠️  spec-env.json not found; skipping spec-dir scan, checking /tmp only"
+    for pid_file in /tmp/claude-monitor-*.pid; do
+        [ -f "$pid_file" ] || continue
+        PID=$(cat "$pid_file" 2>/dev/null)
+        if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+            kill "$PID" 2>/dev/null
+            sleep 1
+            kill -0 "$PID" 2>/dev/null && kill -9 "$PID" 2>/dev/null
+            echo "✅ Stopped monitor process $PID"
+        fi
+    done
+fi
 ```
 
 ### Step 3: Remove spec-env.json (claw side)
@@ -584,17 +604,18 @@ else
 fi
 ```
 
-### Step 10: Cleanup /tmp control files
+### Step 10: Cleanup control files
 
 ```bash
+# Remove legacy /tmp fallback files (test-only or pre-migration remnants)
 rm -f /tmp/claude-monitor-*.pid /tmp/claude-monitor-*.lock
-echo "✅ /tmp control files cleaned up"
+echo "✅ /tmp fallback control files cleaned up (if any)"
 ```
 
 If any file cannot be removed, warn and continue:
 > ⚠️ Could not remove some /tmp control files. They are harmless and will be cleaned up on next reboot.
 
-> **Note**: Runtime data files (`monitor-state.json`, `worker.log`, `daemon.log`) live inside spec directories under `{WORKSPACE}/{DOC_DIR}` and are **not removed** — they belong to the spec's history. Delete them manually per spec if needed.
+> **Note**: `daemon.pid` and `daemon.lock` for real tasks live inside each spec directory under `{WORKSPACE}/{DOC_DIR}`. These are already cleaned up by Step 2 above when the daemon was stopped. Runtime history files (`monitor-state.json`, `worker.log`, `daemon.log`) are **not removed** — they belong to the spec's history. Delete them manually per spec if needed.
 
 ### Uninstall Completion Report
 

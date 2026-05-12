@@ -7,8 +7,8 @@ File protocol:
   {SPEC_PATH}/monitor-state.json <- daemon runtime state + checker PID (managed by this script)
   {SPEC_PATH}/worker.log         <- Claude Code worker output (written by launch_claude_spec.sh)
   {SPEC_PATH}/daemon.log         <- monitor daemon output (nohup redirect)
-  /tmp/claude-monitor-{id}.pid   <- daemon PID (process control only)
-  /tmp/claude-monitor-{id}.lock  <- flock (double-start prevention)
+  {SPEC_PATH}/daemon.pid         <- daemon PID file (falls back to /tmp for unknown task IDs)
+  {SPEC_PATH}/daemon.lock        <- flock double-start prevention (falls back to /tmp)
 
 Usage:
   python3 snapshot.py <task_id> cycle    -- Run one monitoring cycle

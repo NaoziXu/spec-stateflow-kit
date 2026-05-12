@@ -20,4 +20,4 @@ A collaborative toolkit where your claw agent drives Claude Code to execute stru
 |-------------------|-------------------|
 | `README.md`       | Architecture overview, state machine design, component descriptions, best practices / 架构总览、状态机设计、组件说明、最佳实践 |
 | `Installation.md` | Installation guide, verification steps, troubleshooting / 安装指南、验证步骤、故障排查 |
-| `Prompts.md`      | Prompt templates for all 11 scenes (agent + Claude Code) / 全 11 个场景的提示词模板 |
+| `Prompts.md`      | Prompt templates for all 14 scenes (0–13, agent + Claude Code) / 全 14 个场景（0–13）的提示词模板 |
