@@ -35,7 +35,7 @@ User Input
 │
 ├─ Bug fix / systematic refactoring? ──────────────────→ Fix → Use spec-stateflow (Phase 1-2 required)
 │
-├─ "continue" / "updatecode" / "resume"? ──────────────→ Compression Recovery → Step 0 below + spec-stateflow
+├─ "continue" / "resume"? ──────────────────────────────→ Compression Recovery → Step 0 below + spec-stateflow
 │
 ├─ Single file / obvious fix / no design? ─────────────→ Simple → Execute directly, no Spec
 │
@@ -57,13 +57,12 @@ User Input
 
 | Command | Action |
 |---------|--------|
-| `updatecode` | Read `{SPEC_PATH}/tasks.md` → resume from breakpoint (Step 0 first) |
-| `continue` / `resume` | Same as `updatecode` |
+| `continue` / `resume` | Read `{SPEC_PATH}/tasks.md` → resume from breakpoint (Step 0 first) |
 | `check progress` / `task status` | Read `tasks.md` → display current progress |
 
 ## Step 0: Session Context Recovery
 
-When user says "continue" / "updatecode" / "resume", execute Step 0 before invoking spec-stateflow Compression Recovery:
+When user says "continue" / "resume", execute Step 0 before invoking spec-stateflow Compression Recovery:
 
 ```
 1. Read ~/.claude/spec-session.json

@@ -176,7 +176,7 @@ spec-stateflow-kit/
 **角色：** 常驻路由层（运行在 Claude Code 内部）
 **功能：** 在每次 Claude Code 会话中加载（`alwaysApply: true`），提供三项服务：
 1. **任务分类** — 将用户输入映射为 Complex / Fix / Simple / Routine 并按类路由
-2. **命令路由** — 处理 `updatecode` / `continue` / `resume` / `check progress`，无需用户主动提及 spec-stateflow
+2. **命令路由** — 处理 `continue` / `resume` / `check progress`，无需用户主动提及 spec-stateflow
 3. **Step 0 会话恢复** — 会话启动时读取 `~/.claude/spec-session.json`；若最近且未完成，预加载上下文并直接跳转到压缩恢复 Step 2
 
 **关键设计：** 仅为薄路由层，不包含工作流逻辑。所有执行立即委托给 `spec-stateflow`。读取 `~/.claude/spec-env.json` 进行路径解析。

@@ -176,7 +176,7 @@ Each task within `tasks.md` follows a strict lifecycle:
 **Role:** Always-active routing layer (runs inside Claude Code)
 **What it does:** Loaded in every Claude Code session (`alwaysApply: true`). Provides three services:
 1. **Task classification** — maps user input to Complex / Fix / Simple / Routine and routes accordingly
-2. **Command routing** — handles `updatecode` / `continue` / `resume` / `check progress` without requiring the user to mention spec-stateflow
+2. **Command routing** — handles `continue` / `resume` / `check progress` without requiring the user to mention spec-stateflow
 3. **Step 0 session recovery** — reads `~/.claude/spec-session.json` on session start; if recent and incomplete, pre-loads context and routes directly to Compression Recovery Step 2
 
 **Key design:** Thin routing layer only — no workflow logic. Delegates immediately to `spec-stateflow` for all execution. Reads `~/.claude/spec-env.json` for path resolution.

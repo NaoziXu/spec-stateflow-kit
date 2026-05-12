@@ -415,7 +415,7 @@ Key reminders for execution:
 #### Full Compression Recovery Flow (6 Steps)
 
 **Step 0: Fast Session Re-location (delegate to spec-router)**
-- spec-router handles Step 0 when user says "continue" / "updatecode" / "resume"
+- spec-router handles Step 0 when user says "continue" / "resume"
 - Step 0 reads `~/.claude/spec-session.json`, pre-loads task context, and either fast-forwards to Step 2 (fresh session) or falls through to Step 1 (stale/missing)
 - If spec-router Step 0 fast-forwarded here: proceed directly to Step 2 (skip Step 1 directory scan)
 
