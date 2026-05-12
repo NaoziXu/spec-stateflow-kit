@@ -54,6 +54,8 @@ User Input
 > **Fix vs Simple boundary**: Fix = cross-module impact, or requires design before coding. Simple = localized, obvious fix in ≤1 file, no architectural implications.
 >
 > **Default bias**: When task type is uncertain, prefer Complex or Fix over Simple. A false positive (treating Simple as Complex) wastes one planning step. A false negative (treating Complex as Simple) loses all the work done without a Spec.
+>
+> **Ambiguity checkpoint**: If the boundary is still unclear after applying the table above, ask the user: "Does this touch more than one module, or does it need architectural decisions?" Yes → Complex/Fix. No → Simple.
 
 ## Common Commands
 
