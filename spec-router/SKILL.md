@@ -35,7 +35,7 @@ User Input
 │
 ├─ Bug fix / systematic refactoring? ──────────────────→ Fix → Use spec-stateflow (Phase 1-2 required)
 │
-├─ "continue" / "resume"? ──────────────────────────────→ Compression Recovery → Step 0 below + spec-stateflow
+├─ "continue" / "resume"? ──────────────────────────────→ Run Step 0 (below) → then invoke spec-stateflow Compression Recovery
 │
 ├─ Single file / obvious fix / no design? ─────────────→ Simple → Execute directly, no Spec
 │
@@ -57,7 +57,7 @@ User Input
 
 | Command | Action |
 |---------|--------|
-| `continue` / `resume` | Read `{SPEC_PATH}/tasks.md` → resume from breakpoint (Step 0 first) |
+| `continue` / `resume` | Step 0 (fast-path recovery) → invoke spec-stateflow Compression Recovery |
 | `check progress` / `task status` | Read `tasks.md` → display current progress |
 
 ## Step 0: Session Context Recovery
@@ -84,7 +84,7 @@ When user says "continue" / "resume", execute Step 0 before invoking spec-statef
    - Check git_head: run `git rev-parse --short HEAD` in workspace
      - If git_head differs: output "⚠️ git HEAD changed since last session — Step 2 code verification required"
      - Force Step 2 (do not skip code verification)
-   - Proceed to spec-stateflow Compression Recovery Step 2 (skip Step 1 directory scan)
+   - → Invoke spec-stateflow: enter Compression Recovery at Step 2 (skip Step 1 directory scan)
 
 5. Step 0 does NOT bypass Step 2 git verification — even with a valid session.json,
    if git_head changed or any [✓] rows exist, Step 2 is mandatory.
