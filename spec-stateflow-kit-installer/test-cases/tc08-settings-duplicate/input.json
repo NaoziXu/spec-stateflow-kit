@@ -1,0 +1,11 @@
+{
+  "existing_settings": {
+    "hooks": {
+      "Stop": [
+        {"command": "~/.claude/scripts/spec-stop-anchor.sh"}
+      ]
+    },
+    "allowedTools": ["Read", "Write", "Bash(git *)"]
+  },
+  "allowed_bash_patterns": []
+}

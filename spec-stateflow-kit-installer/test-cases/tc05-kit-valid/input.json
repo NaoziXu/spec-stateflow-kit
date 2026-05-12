@@ -1,0 +1,11 @@
+{
+  "kit_components_present": [
+    "spec-task-progress",
+    "claude-code-spec-driver",
+    "claude-code-spec-monitor",
+    "spec-stateflow",
+    "spec-router/SKILL.md",
+    "spec-stateflow-kit-installer/scripts/spec-stop-anchor.sh",
+    "spec-stateflow-kit-installer/scripts/spec-state-guard.sh"
+  ]
+}

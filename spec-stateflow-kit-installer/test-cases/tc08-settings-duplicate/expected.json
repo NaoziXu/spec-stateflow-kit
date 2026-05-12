@@ -1,0 +1,6 @@
+{
+  "hooks_added": 1,
+  "duplicate_hooks": ["spec-stop-anchor.sh"],
+  "prompt_required": true,
+  "tools_added": 3
+}

@@ -1,3 +1,0 @@
-{
-  "claude_md_content": "# My Config\n\nSome existing content here.\n\n<!-- SPEC_STATEFLOW_KIT_BEGIN -->\n## Spec Path Resolution\n\n| Placeholder | Meaning | Actual Value |\nsome spec content here\n<!-- SPEC_STATEFLOW_KIT_END -->\n\n# Other Sections"
-}

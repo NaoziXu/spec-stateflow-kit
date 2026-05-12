@@ -1,3 +1,0 @@
-{
-  "claude_md_content": "# Claude Code Usage Guidelines\n\n## Spec Workflow\n\nSpec-stateflow is used for complex tasks. The SPEC_DIR variable contains all spec files. Every complex task must go through the spec workflow before coding."
-}

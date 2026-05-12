@@ -692,22 +692,22 @@ When user inputs `test installer` or `test spec-installer`:
 
 | Category | Cases | What is tested |
 |----------|-------|----------------|
-| Language detection | tc01–tc04 | CLAUDE.md content + request phrase → `cjk` or `english` |
-| Marker detection | tc05–tc07 | CLAUDE.md content → marker status and required action |
-| Legacy keyword detection | tc08 | CLAUDE.md without markers → legacy keyword scan result |
+| Decision routing | tc01–tc04 | User phrase → correct mode (install / uninstall / self_test / ask) |
+| Kit validation | tc05–tc06 | Present components list → valid=true or valid=false with missing list |
+| settings.json merge | tc07–tc08 | Existing settings → hooks_added, tools_added, prompt_required |
 
 **Example test run output:**
 ```
 spec-installer test results:
 
-tc01-lang-detect-cjk-above-threshold     PASS
-tc02-lang-detect-english-below-threshold PASS
-tc03-lang-detect-empty-cjk-request       PASS
-tc04-lang-detect-empty-english-request   PASS
-tc05-marker-balanced                     PASS
-tc06-marker-none-no-legacy               PASS
-tc07-marker-unbalanced                   PASS
-tc08-legacy-keywords-no-markers          PASS
+tc01-route-install         PASS
+tc02-route-uninstall       PASS
+tc03-route-self-test       PASS
+tc04-route-ambiguous       PASS
+tc05-kit-valid             PASS
+tc06-kit-missing           PASS
+tc07-settings-fresh        PASS
+tc08-settings-duplicate    PASS
 
 8/8 cases passed ✓
 ```

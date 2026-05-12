@@ -1,0 +1,6 @@
+{
+  "kit_components_present": [
+    "spec-task-progress",
+    "claude-code-spec-driver"
+  ]
+}

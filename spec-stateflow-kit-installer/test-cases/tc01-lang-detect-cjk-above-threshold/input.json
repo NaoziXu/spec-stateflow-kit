@@ -1,4 +1,0 @@
-{
-  "claude_md_content": "## 使用规范\n\n本文档定义了Claude Code协作的标准。所有复杂任务必须遵循规范流程。每个功能模块需要先写需求文档，再进行设计，然后拆解任务，最后按任务顺序逐一执行。代码变更必须确认范围和影响。",
-  "request_phrase": "install spec kit"
-}
