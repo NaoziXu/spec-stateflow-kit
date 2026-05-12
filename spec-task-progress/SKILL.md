@@ -8,8 +8,6 @@ alwaysApply: false
 
 Query spec task progress by LLM-parsing `tasks.md`, then write structured `progress.json`.
 
-> `query_task.py` and `query_overview.py` have been removed from this skill. All progress parsing is now done by LLM.
-
 > **Design note**: No user-confirmation checkpoints — writing `progress.json` is idempotent and harmless. When daemon-invoked (Scene 3), no human is present. When user-invoked, the only side effect is overwriting the JSON file with fresh data.
 
 ## Trigger Formats

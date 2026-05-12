@@ -1,8 +1,8 @@
 #!/bin/bash
-# spec-stop-anchor.sh — 在 Claude Code 会话结束时快照活跃 spec 任务
-# 读取：~/.claude/spec-env.json  写入：~/.claude/spec-session.json（原子写）
-# 始终 exit 0 — 失败静默，不影响 Claude Code。
-# 注意：不使用 set -e，确保 python3 不可用时也能静默退出 0。
+# spec-stop-anchor.sh — Snapshot the active spec task when a Claude Code session ends
+# Reads: ~/.claude/spec-env.json  Writes: ~/.claude/spec-session.json (atomic)
+# Always exits 0 — failures are silent and do not affect Claude Code.
+# Note: set -e is not used so the script silently exits 0 even if python3 is unavailable.
 
 SPEC_ENV="$HOME/.claude/spec-env.json"
 [ -f "$SPEC_ENV" ] || exit 0
@@ -116,7 +116,7 @@ for tf in task_files:
             active_specs.append((mtime, spec_path, int(first_tilde[0]), first_tilde[1].strip(), content))
         elif all_done:
             complete_specs.append((mtime, spec_path))
-        # rollback（无 [~]，有 [ ]）：跳过——保留已有 session.json
+        # rollback (no [~], has [ ]): skip — preserve existing session.json
     except Exception:
         continue
 

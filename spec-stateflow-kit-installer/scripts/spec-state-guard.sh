@@ -1,9 +1,9 @@
 #!/bin/bash
-# spec-state-guard.sh — 验证 tasks.md 状态转移（PostToolUse hook）
-# 读取：stdin（工具 JSON），tasks.md（磁盘）
-# 写入：仅向 stderr 输出警告
-# 始终 exit 0 — 仅供参考，永不阻断 Claude Code。
-# 注意：不使用 set -e，确保任何异常均静默退出 0。
+# spec-state-guard.sh — Validates tasks.md state transitions (PostToolUse hook)
+# Reads: stdin (tool JSON), tasks.md (disk)
+# Writes: warnings to stderr only
+# Always exits 0 — informational only, never blocks Claude Code.
+# Note: set -e is not used so any error silently exits 0.
 
 python3 - <<'PYEOF'
 import json, os, re, sys
@@ -29,7 +29,7 @@ except Exception:
 
 warnings = []
 
-# --- 检查 A：乱序完成 ---
+# --- Check A: out-of-order completion ---
 OVERVIEW_RE = re.compile(r'^- \[([ ~✓⏭])\] (\d+)\. (.+)$', re.MULTILINE)
 overview = OVERVIEW_RE.findall(content)
 seen_incomplete = False
@@ -38,12 +38,12 @@ for marker, num, name in overview:
         seen_incomplete = True
     elif marker == '✓' and seen_incomplete:
         warnings.append(
-            f"[spec-state-guard] 警告：Task {num} ({name.strip()}) 在未完成任务之后被标为 [✓]"
-            f" — 是否跳过了 [~] 转移？请在标记完成前确认实现已落地。"
+            f"[spec-state-guard] Warning: Task {num} ({name.strip()}) marked [✓] after incomplete tasks"
+            f" — did you skip the [~] transition? Confirm implementation is complete before marking done."
         )
         seen_incomplete = False
 
-# --- 检查 B：[✓] 任务缺少 Commit ---
+# --- Check B: [✓] task missing Commit ---
 done_tasks = [(num, name) for marker, num, name in overview if marker == '✓']
 
 def get_commit_value_new(content, task_num):
@@ -78,8 +78,8 @@ for num, name in done_tasks:
         commit_val = get_commit_value_old(content, num)
     if commit_val is None or commit_val in EMPTY_VALUES:
         warnings.append(
-            f"[spec-state-guard] 警告：Task {num} ({name.strip()}) 已标为 [✓]"
-            f" 但 Commit 字段为空。请补填：'feat(module): [task-id] description (abc1234)'"
+            f"[spec-state-guard] Warning: Task {num} ({name.strip()}) is marked [✓]"
+            f" but Commit field is empty. Fill in: 'feat(module): [task-id] description (abc1234)'"
         )
 
 for w in warnings:

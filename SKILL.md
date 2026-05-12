@@ -1,6 +1,6 @@
 ---
 name: spec-stateflow-kit
-description: "A toolkit for claw agent and Claude Code to collaborate on structured development workflows driven by spec documents. Navigation entry only — see Overview.md for architecture and Installation.md to get started."
+description: "A toolkit for claw agent and Claude Code to collaborate on structured development workflows driven by spec documents. Navigation entry only — see README.md for architecture and Installation.md to get started."
 alwaysApply: false
 ---
 
@@ -8,7 +8,7 @@ alwaysApply: false
 
 A collaborative toolkit where your claw agent drives Claude Code to execute structured development workflows based on spec documents — turning complex tasks into tracked, state-driven, resumable execution pipelines.
 
-> ⚠️ This is a **fake skill** (placeholder navigation entry) containing no executable logic. This file serves only as a skill marker at the kit root directory. For the full architecture design, component descriptions, state machine design, and deployment topology, please read **Overview.md** in the same directory.
+> ⚠️ This is a **fake skill** (placeholder navigation entry) containing no executable logic. This file serves only as a skill marker at the kit root directory. For the full architecture design, component descriptions, state machine design, and deployment topology, please read **README.md** in the same directory.
 
 ---
 

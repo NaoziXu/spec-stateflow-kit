@@ -1,19 +1,19 @@
 #!/bin/bash
-# launch_claude_spec.sh — 启动 Claude Code 执行 spec 任务
-# 从 spec-env.json 读取路径配置，零硬编码
+# launch_claude_spec.sh — Launch Claude Code to execute a spec task
+# Reads path config from spec-env.json, no hardcoding
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# 读取 spec-env.json（位于 SKILLS_DIR 上一级，即 SCRIPT_DIR 上三级）
+# Read spec-env.json (located one level above SKILLS_DIR, i.e. three levels above SCRIPT_DIR)
 ENV_FILE="$(cd "$SCRIPT_DIR/../../.." && pwd)/spec-env.json"
 if [ ! -f "$ENV_FILE" ]; then
-    echo "错误: spec-env.json 不存在: $ENV_FILE" >&2
-    echo "请先安装 spec 套件" >&2
+    echo "Error: spec-env.json not found: $ENV_FILE" >&2
+    echo "Please install the spec kit first." >&2
     exit 1
 fi
 
-# 读取并校验 JSON 字段
+# Read and validate JSON fields
 read_json_field() {
     local file="$1" key="$2"
     python3 -c "
@@ -23,11 +23,11 @@ try:
         d = json.load(f)
     v = d.get('$key')
     if v is None:
-        print('错误: spec-env.json 缺少 $key 字段', file=sys.stderr)
+        print('Error: spec-env.json missing field: $key', file=sys.stderr)
         sys.exit(1)
     print(v)
 except (OSError, json.JSONDecodeError) as e:
-    print('错误: 无法读取 spec-env.json: ' + str(e), file=sys.stderr)
+    print('Error: cannot read spec-env.json: ' + str(e), file=sys.stderr)
     sys.exit(1)
 "
 }
@@ -36,7 +36,7 @@ WORKSPACE=$(read_json_field "$ENV_FILE" "WORKSPACE")
 DOC_DIR=$(read_json_field "$ENV_FILE" "DOC_DIR")
 CLAUDE_CLI=$(read_json_field "$ENV_FILE" "CLAUDE_CLI")
 
-# 读取可选 worktree 开关（默认 false）
+# Read optional worktree flag (default false)
 WORKTREE_ENABLED=$(python3 -c "
 import json, sys
 try:
@@ -45,7 +45,7 @@ try:
 except: print('false')
 ")
 
-# 参数解析
+# Argument parsing
 TASK_ID=""
 PROJECT_DIR=""
 PROMPT=""
@@ -58,62 +58,62 @@ while [[ $# -gt 0 ]]; do
         --prompt)     PROMPT="$2";    shift 2 ;;
         --budget|--max-budget-usd) EXTRA_ARGS="$EXTRA_ARGS --max-budget-usd $2"; shift 2 ;;
         --model)      EXTRA_ARGS="$EXTRA_ARGS --model $2"; shift 2 ;;
-        *) echo "未知参数: $1" >&2; exit 1 ;;
+        *) echo "Unknown argument: $1" >&2; exit 1 ;;
     esac
 done
 
-# 参数校验
+# Argument validation
 if [ -z "$PROJECT_DIR" ]; then
-    echo "错误: 必须指定 --project-dir" >&2
+    echo "Error: --project-dir is required" >&2
     exit 1
 fi
 if [ -z "$PROMPT" ]; then
-    echo "错误: 必须指定 --prompt" >&2
+    echo "Error: --prompt is required" >&2
     exit 1
 fi
 if [ ! -d "$PROJECT_DIR" ]; then
-    echo "错误: 项目目录不存在: $PROJECT_DIR" >&2
+    echo "Error: project directory does not exist: $PROJECT_DIR" >&2
     exit 1
 fi
 if ! command -v "$CLAUDE_CLI" &>/dev/null; then
-    echo "错误: Claude Code 未找到: $CLAUDE_CLI" >&2
+    echo "Error: Claude Code not found: $CLAUDE_CLI" >&2
     exit 1
 fi
 
-# --- Worktree 设置（可选，由 spec-env.json worktree 字段控制）---
+# --- Worktree setup (optional, controlled by spec-env.json worktree field) ---
 EFFECTIVE_DIR="$PROJECT_DIR"
 
 if [ "$WORKTREE_ENABLED" = "true" ] && [ -n "$TASK_ID" ]; then
     WORKTREE_PATH="${PROJECT_DIR}/.worktrees/spec-${TASK_ID}"
-    echo "Worktree 模式已启用"
+    echo "Worktree mode enabled"
 
     if [ -d "$WORKTREE_PATH" ]; then
         wt_status=$(cd "$WORKTREE_PATH" && git status --short 2>/dev/null || echo "ERROR")
         if [ "$wt_status" = "ERROR" ]; then
-            echo "错误：无法检查已有 worktree 的 git 状态：$WORKTREE_PATH" >&2
+            echo "Error: cannot check git status of existing worktree: $WORKTREE_PATH" >&2
             exit 1
         fi
         if [ -n "$wt_status" ]; then
-            echo "错误：已有 worktree 存在未提交变更：" >&2
+            echo "Error: existing worktree has uncommitted changes:" >&2
             echo "$wt_status" >&2
-            echo "请手动处理未提交变更后重试。" >&2
+            echo "Resolve uncommitted changes manually, then retry." >&2
             exit 1
         fi
-        echo "复用已有 worktree：$WORKTREE_PATH"
+        echo "Reusing existing worktree: $WORKTREE_PATH"
     else
         git -C "$PROJECT_DIR" worktree add "$WORKTREE_PATH" -b "spec/${TASK_ID}" 2>&1 || {
-            echo "错误：无法在 $WORKTREE_PATH 创建 worktree" >&2
-            echo "常见原因：分支 'spec/${TASK_ID}' 已存在，或路径冲突。" >&2
+            echo "Error: cannot create worktree at $WORKTREE_PATH" >&2
+            echo "Common causes: branch 'spec/${TASK_ID}' already exists, or path conflict." >&2
             exit 1
         }
-        echo "已创建 worktree：$WORKTREE_PATH"
+        echo "Created worktree: $WORKTREE_PATH"
     fi
     echo "Worktree: $WORKTREE_PATH"
     EFFECTIVE_DIR="$WORKTREE_PATH"
 fi
-# --- Worktree 设置结束 ---
+# --- End worktree setup ---
 
-# 日志文件：有 task-id 则解析 SPEC_PATH 放到 spec 目录内；否则用时间戳落 /tmp
+# Log file: if task-id given, resolve SPEC_PATH and write inside spec dir; otherwise use /tmp with timestamp
 if [ -n "$TASK_ID" ]; then
     SPEC_PATH=$(python3 -c "
 import json, os, glob, sys
@@ -142,7 +142,7 @@ else
     LOG_FILE="/tmp/claude-spec-output-${LOG_TS}.log"
 fi
 
-# 启动 Claude Code
+# Launch Claude Code
 cd "$EFFECTIVE_DIR"
 if [ -n "$TASK_ID" ]; then
     nohup "$CLAUDE_CLI" -p "$PROMPT" \
@@ -155,5 +155,5 @@ else
 fi
 
 echo "PID: $!"
-echo "项目目录: $PROJECT_DIR"
-echo "日志: $LOG_FILE"
+echo "Project dir: $PROJECT_DIR"
+echo "Log: $LOG_FILE"
