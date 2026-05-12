@@ -67,6 +67,7 @@ When user says "continue" / "resume", execute Step 0 before invoking spec-statef
 ```
 1. Read ~/.claude/spec-session.json
    - Not found → skip to full 6-step Compression Recovery
+   - Malformed / JSON parse error → treat as not found; skip to full 6-step Compression Recovery
 
 2. Check updated_at
    - updated_at > 4 hours ago → stale; skip to full 6-step Compression Recovery
@@ -82,6 +83,7 @@ When user says "continue" / "resume", execute Step 0 before invoking spec-statef
    - Pre-load context: task_id, active_task_num, active_task_name, active_task_scope, active_task_specifics
    - Output: "Resuming {task_id} — Task {active_task_num}: {active_task_name}"
    - Check git_head: run `git rev-parse --short HEAD` in workspace
+     - If command fails (non-git workspace or no commits): skip git_head check; proceed without warning
      - If git_head differs: output "⚠️ git HEAD changed since last session — Step 2 code verification required"
      - Force Step 2 (do not skip code verification)
    - → Invoke spec-stateflow: enter Compression Recovery at Step 2 (skip Step 1 directory scan)
