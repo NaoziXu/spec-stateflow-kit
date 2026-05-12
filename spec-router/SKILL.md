@@ -85,11 +85,11 @@ When user says "continue" / "resume", execute Step 0 before invoking spec-statef
 
 ```
 1. Read ~/.claude/spec-session.json
-   - Not found → skip to full 6-step Compression Recovery
-   - Malformed / JSON parse error → treat as not found; skip to full 6-step Compression Recovery
+   - Not found → skip to full 6-step Compression Recovery (see `spec-stateflow` skill)
+   - Malformed / JSON parse error → treat as not found; skip to full 6-step Compression Recovery (see `spec-stateflow` skill)
 
 2. Check updated_at
-   - updated_at > 4 hours ago → stale; skip to full 6-step Compression Recovery
+   - updated_at > 4 hours ago → stale; skip to full 6-step Compression Recovery (see `spec-stateflow` skill)
 
 3. If is_complete == true:
    - Output: "Spec {task_id} is already complete. No recovery needed."
@@ -98,7 +98,7 @@ When user says "continue" / "resume", execute Step 0 before invoking spec-statef
 
 4. If is_complete == false and updated_at within 4h:
    - Locate {spec_path} directory
-   - If directory not found → skip to full 6-step Compression Recovery
+   - If directory not found → skip to full 6-step Compression Recovery (see `spec-stateflow` skill)
    - Pre-load context: task_id, active_task_num, active_task_name, active_task_scope, active_task_specifics
    - Output: "Resuming {task_id} — Task {active_task_num}: {active_task_name}"
    - Check git_head: run `git rev-parse --short HEAD` in workspace
