@@ -21,19 +21,10 @@ Paths are read from `{SKILLS_DIR}/../spec-env.json`, no hardcoding:
 ```
 
 - **doc directory**: `{WORKSPACE}/{DOC_DIR}/` (assembled by scripts at runtime)
-- **Project directory**: Confirmed via `.project` file (see below)
+- **Project directory**: Read from `project_name` field in `{SPEC_PATH}/progress.json` (see Step 2)
 - **Claude Code CLI**: Read from `CLAUDE_CLI` in spec-env.json
 
 **⚠️ If `spec-env.json` doesn't exist**: Prompt user to install spec kit first.
-
-## Project Directory Confirmation Mechanism
-
-Project directory cannot be hardcoded, determined by the following logic:
-
-1. Check if `.project` file exists in the spec directory
-   - Yes -> Read content (e.g. `mas-workflow`), project directory = `{WORKSPACE}/{.project content}`
-2. No -> List directories under `{WORKSPACE}/` for user to choose
-   - After user confirmation, write project name to `{SPEC_PATH}/.project` file for persistence
 
 ## Pre-check
 
