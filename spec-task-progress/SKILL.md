@@ -32,12 +32,23 @@ When triggered via Scene 3, extract `task_id` from the `需求编号：` line an
 
 ## Environment & Path Resolution
 
-### Dual-Environment Path Resolution
+### Path Resolution
 
-| Environment | Invocation method | Where to read `SPEC_DIR` |
-|-------------|------------------|--------------------------|
-| **Claude Code** (daemon spawns checker via `claude -p`) | `claude -p "帮我看一下..." --dangerously-skip-permissions` | `CLAUDE.md` `Spec 路径解析` table — `{SPEC_DIR}` row |
-| **claw agent** (user invokes skill directly) | Skill trigger in agent | `spec-env.json` → `{WORKSPACE}/{DOC_DIR}/` |
+Both Claude Code and claw agent read `spec-env.json` for path resolution:
+
+| Environment | File location | How to read |
+|-------------|--------------|-------------|
+| **Claude Code** | `~/.claude/spec-env.json` | Read at runtime: `SPEC_DIR = WORKSPACE + "/" + DOC_DIR` |
+| **claw agent** | `{SKILLS_DIR}/../spec-env.json` | Read at runtime: `SPEC_DIR = WORKSPACE + "/" + DOC_DIR` |
+
+```python
+# Pseudocode for both environments (adjust path per environment)
+import json, os
+env = json.load(open(spec_env_path))
+SPEC_DIR = os.path.join(env["WORKSPACE"], env["DOC_DIR"])
+```
+
+If `~/.claude/spec-env.json` does not exist (Claude Code side): output error "spec-env.json not found — please re-install the spec kit" and abort.
 
 Both environments use identical logic once `SPEC_DIR` is resolved.
 
@@ -90,6 +101,11 @@ Count tasks by scanning **only top-level list items** (lines starting with `- [m
 - **is_complete**: `done == total` (and `total > 0`)
 
 **Do not count markers that appear inside task content** (Scope, Specifics, Notes fields). Only the leading marker of a top-level list item counts.
+
+**双层一致性：** tasks.md 采用双层结构时（Overview 列表 + `### Task N:` 表格），两层的状态标记可能不一致。解析规则：
+- **计数层（Overview 列表）** 是 spec-task-progress 的计数依据——LLM 扫描 Overview 列表中的 `- [marker]` 行
+- **权威层（表格 Status 字段）** 是任务状态的权威来源——不一致时以表格 Status 字段为准
+- LLM 计数时以 Overview 列表的标记为准，但若发现两层不一致，应在输出中注明
 
 ## progress.json Schema
 
