@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """
-Claude Code Monitor - State Snapshot Management (v3)
+Claude Code Monitor - State Snapshot Management
 
-progress.json  ← written by spec-task-progress skill (LLM parse)
-checker.json   ← written by daemon (PID tracking)
-/tmp/claude-monitor-{task_id}.json ← daemon runtime state
+File protocol:
+  {SPEC_PATH}/progress.json      <- written by spec-task-progress skill (LLM parse); includes project_name
+  {SPEC_PATH}/monitor-state.json <- daemon runtime state + checker PID (managed by this script)
+  {SPEC_PATH}/worker.log         <- Claude Code worker output (written by launch_claude_spec.sh)
+  {SPEC_PATH}/daemon.log         <- monitor daemon output (nohup redirect)
+  /tmp/claude-monitor-{id}.pid   <- daemon PID (process control only)
+  /tmp/claude-monitor-{id}.lock  <- flock (double-start prevention)
 
 Usage:
-  python3 snapshot.py <task_id> cycle    -- Run one monitoring cycle (replaces old check+ACTION)
-  python3 snapshot.py <task_id> init     -- Initialize state file (legacy, kept for compatibility)
+  python3 snapshot.py <task_id> cycle    -- Run one monitoring cycle
+  python3 snapshot.py <task_id> init     -- Initialize state file
   python3 snapshot.py <task_id> status   -- View current state
   python3 snapshot.py <task_id> processes -- List matching claude processes
   python3 snapshot.py <task_id> stop     -- Kill processes, delete state + log files
@@ -22,7 +26,6 @@ sys.stdout.reconfigure(encoding='utf-8')
 SCRIPT_DIR    = os.path.dirname(os.path.abspath(__file__))
 SPEC_ENV_PATH = os.path.normpath(os.path.join(SCRIPT_DIR, '..', '..', '..', 'spec-env.json'))
 
-# Daemon cycle interval in minutes — shared constant for both freshness threshold and sleep interval
 DAEMON_CYCLE_MINUTES = 15
 
 
@@ -31,7 +34,6 @@ DAEMON_CYCLE_MINUTES = 15
 # ---------------------------------------------------------------------------
 
 class SpecEnvError(Exception):
-    """Raised when spec-env.json is missing or malformed."""
     pass
 
 
@@ -50,7 +52,6 @@ def load_spec_env():
 # ---------------------------------------------------------------------------
 
 def read_progress_json(spec_path: str) -> Optional[dict]:
-    """Read progress.json; return None on any failure."""
     path = os.path.join(spec_path, "progress.json")
     try:
         with open(path, encoding='utf-8') as f:
@@ -60,7 +61,6 @@ def read_progress_json(spec_path: str) -> Optional[dict]:
 
 
 def is_progress_fresh(data: Optional[dict]) -> bool:
-    """Return True if progress.json was updated within one daemon cycle."""
     if not data or not isinstance(data, dict):
         return False
     updated_str = data.get("updated_at")
@@ -74,45 +74,10 @@ def is_progress_fresh(data: Optional[dict]) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# checker.json helpers (written by daemon, read by daemon)
-# ---------------------------------------------------------------------------
-
-def read_checker_json(spec_path: str) -> Optional[dict]:
-    """Read checker.json (daemon metadata); return None on any failure."""
-    path = os.path.join(spec_path, "checker.json")
-    try:
-        with open(path, encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-
-def write_checker_json(spec_path: str, pid: int) -> None:
-    """Atomically write checker.json after spawning a new progress checker."""
-    path = os.path.join(spec_path, "checker.json")
-    data = {
-        "progress_checker_pid": pid,
-        "triggered_by": "daemon",
-        "spawned_at": datetime.now().isoformat(timespec="seconds"),
-    }
-    tmp_path = path + ".tmp"
-    with open(tmp_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp_path, path)
-
-
-# ---------------------------------------------------------------------------
 # Spec path helpers
 # ---------------------------------------------------------------------------
 
 def find_spec_path(task_id: str, env: dict) -> Optional[str]:
-    """Scan SPEC_DIR for a directory whose name contains task_id.
-
-    Matching strategy (deterministic):
-    1. Prefer names that start with task_id (prefix match)
-    2. Fall back to substring match
-    3. If multiple matches at same priority, prefer shortest name (most specific)
-    """
     workspace = env.get('WORKSPACE', '')
     doc_dir_name = env.get('DOC_DIR', 'doc')
     spec_dir = os.path.join(workspace, doc_dir_name)
@@ -137,15 +102,98 @@ def find_spec_path(task_id: str, env: dict) -> Optional[str]:
 
 
 def find_project_dir(task_id: str, env: dict) -> Optional[str]:
-    """Return project directory from .project file inside spec dir, or None."""
+    """Return project directory from project_name field in progress.json."""
     spec_path = find_spec_path(task_id, env)
     if not spec_path:
         return None
-    project_file = os.path.join(spec_path, '.project')
-    if not os.path.exists(project_file):
+    progress = read_progress_json(spec_path)
+    if not progress:
         return None
-    with open(project_file, encoding='utf-8') as f:
-        return os.path.join(env['WORKSPACE'], f.read().strip())
+    project_name = progress.get('project_name')
+    if not project_name:
+        return None
+    return os.path.join(env['WORKSPACE'], project_name)
+
+
+# ---------------------------------------------------------------------------
+# Path helpers — SPEC_PATH-based with /tmp fallback for unknown task IDs
+# ---------------------------------------------------------------------------
+
+def get_state_path(spec_path: Optional[str], task_id: str = '') -> str:
+    if spec_path:
+        return os.path.join(spec_path, 'monitor-state.json')
+    return f'/tmp/claude-monitor-{task_id}.json'
+
+
+def get_log_path(spec_path: Optional[str], task_id: str = '') -> str:
+    if spec_path:
+        return os.path.join(spec_path, 'worker.log')
+    return f'/tmp/claude-spec-{task_id}.log'
+
+
+def get_daemon_log_path(spec_path: Optional[str], task_id: str = '') -> str:
+    if spec_path:
+        return os.path.join(spec_path, 'daemon.log')
+    return f'/tmp/claude-monitor-{task_id}-daemon.log'
+
+
+# ---------------------------------------------------------------------------
+# State file (monitor-state.json inside SPEC_PATH)
+# ---------------------------------------------------------------------------
+
+def load_state(spec_path: Optional[str], task_id: str = '') -> dict:
+    path = get_state_path(spec_path, task_id)
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, encoding='utf-8') as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_state(
+    spec_path: Optional[str],
+    task_id: str,
+    last_git_head: Optional[str],
+    last_log_size: Optional[int],
+    checker_pid: Optional[int] = None,
+    daemon_status: Optional[str] = None,
+) -> None:
+    path = get_state_path(spec_path, task_id)
+    state = load_state(spec_path, task_id)
+    if last_git_head is not None:
+        state['last_git_head'] = last_git_head
+    if last_log_size is not None:
+        state['last_log_size'] = last_log_size
+    if checker_pid is not None:
+        state['checker_pid'] = checker_pid
+    elif 'checker_pid' not in state:
+        state['checker_pid'] = None
+    if daemon_status is not None:
+        state['daemon_status'] = daemon_status
+    state['last_check_time'] = datetime.now().isoformat()
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def init_state_if_missing(spec_path: Optional[str], task_id: str = '') -> None:
+    path = get_state_path(spec_path, task_id)
+    if not os.path.exists(path):
+        state = {
+            'task_id': task_id,
+            'last_git_head': None,
+            'last_log_size': None,
+            'checker_pid': None,
+        }
+        try:
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(state, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +201,6 @@ def find_project_dir(task_id: str, env: dict) -> Optional[str]:
 # ---------------------------------------------------------------------------
 
 def parse_etime(etime_str: str) -> float:
-    """Parse ps etime (D-HH:MM:SS / HH:MM:SS / MM:SS / SS) to minutes."""
     etime_str = etime_str.strip()
     if not etime_str or etime_str == '-':
         return 0.0
@@ -166,7 +213,6 @@ def parse_etime(etime_str: str) -> float:
         time_part = parts[0]
     segments = time_part.split(':')
     if len(segments) == 1:
-        # Seconds only (very new process)
         hours, minutes, seconds = 0, 0, int(segments[0])
     elif len(segments) == 2:
         hours, minutes, seconds = 0, int(segments[0]), int(segments[1])
@@ -178,10 +224,6 @@ def parse_etime(etime_str: str) -> float:
 
 
 def get_all_matching_processes(task_id: str) -> List[dict]:
-    """Return all claude processes whose command line contains task_id.
-
-    Each element: {"pid": int, "etime_minutes": float, "cmd": str}
-    """
     result = subprocess.run(
         ['ps', '-ewwo', 'pid,etime,command'],
         capture_output=True, text=True
@@ -211,7 +253,6 @@ def get_all_matching_processes(task_id: str) -> List[dict]:
 
 
 def get_worker_processes(task_id: str, progress_checker_pid: Optional[int]) -> List[dict]:
-    """Worker processes = all matching processes minus the progress checker."""
     all_matching = get_all_matching_processes(task_id)
     if progress_checker_pid is None:
         return all_matching
@@ -219,7 +260,6 @@ def get_worker_processes(task_id: str, progress_checker_pid: Optional[int]) -> L
 
 
 def kill_progress_checker(progress_checker_pid: int) -> None:
-    """Terminate the previous progress checker; silently skip if already gone."""
     try:
         os.kill(progress_checker_pid, signal.SIGTERM)
     except ProcessLookupError:
@@ -227,7 +267,6 @@ def kill_progress_checker(progress_checker_pid: int) -> None:
 
 
 def spawn_progress_checker(task_id: str, claude_cli: str, project_dir: str) -> int:
-    """Launch a new progress checker (Scene 3 prompt) and return its PID."""
     prompt = f"帮我看一下spec任务的开发进度\n需求编号：{task_id}"
     proc = subprocess.Popen(
         [claude_cli, "-p", prompt, "--dangerously-skip-permissions"],
@@ -243,7 +282,6 @@ def spawn_progress_checker(task_id: str, claude_cli: str, project_dir: str) -> i
 # ---------------------------------------------------------------------------
 
 def has_git_working_tree_changes(project_dir: str) -> bool:
-    """Check for uncommitted changes in project directory (not doc/spec dir)."""
     result = subprocess.run(
         ['git', 'status', '--short'],
         cwd=project_dir,
@@ -253,7 +291,6 @@ def has_git_working_tree_changes(project_dir: str) -> bool:
 
 
 def has_git_head_changed(project_dir: str, last_head: Optional[str]) -> bool:
-    """Return True if HEAD has moved since last_head was recorded."""
     if not last_head:
         return False
     result = subprocess.run(
@@ -265,7 +302,6 @@ def has_git_head_changed(project_dir: str, last_head: Optional[str]) -> bool:
 
 
 def get_current_git_head(project_dir: str) -> Optional[str]:
-    """Return current git HEAD hash, or None on failure."""
     result = subprocess.run(
         ['git', 'rev-parse', 'HEAD'],
         cwd=project_dir,
@@ -275,98 +311,37 @@ def get_current_git_head(project_dir: str) -> Optional[str]:
     return head if head else None
 
 
-def has_log_growth(task_id: str, last_log_size: Optional[int]) -> bool:
-    """Return True if the Claude Code log file has grown since last check."""
+def has_log_growth(spec_path: Optional[str], task_id: str, last_log_size: Optional[int]) -> bool:
     if last_log_size is None:
         return False
-    log_path = get_log_path(task_id)
+    log_path = get_log_path(spec_path, task_id)
     if not os.path.exists(log_path):
         return False
     return os.path.getsize(log_path) > last_log_size
 
 
-def get_current_log_size(task_id: str) -> Optional[int]:
-    """Return current size of the log file in bytes, or None if not found."""
-    log_path = get_log_path(task_id)
+def get_current_log_size(spec_path: Optional[str], task_id: str) -> Optional[int]:
+    log_path = get_log_path(spec_path, task_id)
     if not os.path.exists(log_path):
         return None
     return os.path.getsize(log_path)
 
 
 # ---------------------------------------------------------------------------
-# State file (/tmp/claude-monitor-{task_id}.json)
+# STOP trigger
 # ---------------------------------------------------------------------------
 
-def get_state_path(task_id: str) -> str:
-    return f"/tmp/claude-monitor-{task_id}.json"
-
-
-def get_log_path(task_id: str) -> str:
-    return f"/tmp/claude-spec-{task_id}.log"
-
-
-def load_state(task_id: str) -> dict:
-    """Load daemon runtime state, returning empty dict if not found."""
-    path = get_state_path(task_id)
-    if not os.path.exists(path):
-        return {}
-    try:
-        with open(path, encoding='utf-8') as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-
-def save_state(task_id: str, last_git_head: Optional[str], last_log_size: Optional[int]) -> None:
-    """Persist baseline values for next cycle comparison."""
-    path = get_state_path(task_id)
-    state = load_state(task_id)
-    if last_git_head is not None:
-        state['last_git_head'] = last_git_head
-    if last_log_size is not None:
-        state['last_log_size'] = last_log_size
+def trigger_stop(task_id: str, spec_path: Optional[str]) -> None:
+    print(f"[cycle] STOP: task {task_id} is_complete=true and progress.json is fresh.")
+    state = load_state(spec_path, task_id)
+    state['daemon_status'] = 'COMPLETED'
     state['last_check_time'] = datetime.now().isoformat()
+    path = get_state_path(spec_path, task_id)
     try:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
-
-
-def init_state_if_missing(task_id: str) -> None:
-    """Create initial state file if it doesn't exist."""
-    path = get_state_path(task_id)
-    if not os.path.exists(path):
-        state = {
-            'task_id': task_id,
-            'last_git_head': None,
-            'last_log_size': None,
-        }
-        try:
-            with open(path, 'w', encoding='utf-8') as f:
-                json.dump(state, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
-
-
-# ---------------------------------------------------------------------------
-# STOP trigger
-# ---------------------------------------------------------------------------
-
-def trigger_stop(task_id: str) -> None:
-    """Mark task as complete and signal daemon to stop."""
-    print(f"[cycle] STOP: task {task_id} is_complete=true and progress.json is fresh.")
-    state_path = get_state_path(task_id)
-    state = load_state(task_id)
-    state['daemon_status'] = 'COMPLETED'
-    state['last_check_time'] = datetime.now().isoformat()
-    try:
-        with open(state_path, 'w', encoding='utf-8') as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-    # Signal the daemon process group to stop (daemon reads state and exits)
-    # The daemon loop checks for daemon_status == 'COMPLETED'
     print("ACTION: STOP")
 
 
@@ -375,53 +350,40 @@ def trigger_stop(task_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 def run_cycle(task_id: str, env: dict) -> None:
-    """Execute one monitoring cycle: read progress, manage checker, detect workers."""
     spec_path = find_spec_path(task_id, env)
     project_dir = find_project_dir(task_id, env)
 
     data = read_progress_json(spec_path) if spec_path else None
-    checker = read_checker_json(spec_path) if spec_path else None
-    progress_checker_pid: Optional[int] = checker.get("progress_checker_pid") if checker else None
+
+    state = load_state(spec_path, task_id)
+    progress_checker_pid: Optional[int] = state.get('checker_pid')
 
     claude_cli = env.get('CLAUDE_CLI', 'claude')
     cwd = project_dir or env.get('WORKSPACE', '.')
 
     if data and is_progress_fresh(data):
-        # --- Fresh path ---
         if data.get("is_complete"):
-            # Kill lingering progress checker before stopping
             if progress_checker_pid:
                 kill_progress_checker(progress_checker_pid)
-            # Remove stale checker.json so next run starts clean
-            if spec_path:
-                try:
-                    os.remove(os.path.join(spec_path, "checker.json"))
-                except FileNotFoundError:
-                    pass
-            trigger_stop(task_id)
+            trigger_stop(task_id, spec_path)
             return
 
-        # Replace progress checker every cycle
         if progress_checker_pid:
             kill_progress_checker(progress_checker_pid)
         new_pid = spawn_progress_checker(task_id, claude_cli, cwd)
-        if spec_path:
-            write_checker_json(spec_path, new_pid)
+        save_state(spec_path, task_id, None, None, checker_pid=new_pid)
         progress_checker_pid = new_pid
         print(f"[cycle] Fresh progress ({data.get('done')}/{data.get('total')}), spawned new checker PID={new_pid}")
 
     else:
-        # --- Degraded path: missing or stale progress.json (includes cold start) ---
         if progress_checker_pid:
             kill_progress_checker(progress_checker_pid)
         new_pid = spawn_progress_checker(task_id, claude_cli, cwd)
-        if spec_path:
-            write_checker_json(spec_path, new_pid)
+        save_state(spec_path, task_id, None, None, checker_pid=new_pid)
         progress_checker_pid = new_pid
         print(f"[cycle] Degraded: progress.json {'missing' if data is None else 'stale'}, spawned new checker PID={new_pid}")
 
-        # Record git/log signals for logging only — no STOP in degraded mode
-        state = load_state(task_id)
+        state = load_state(spec_path, task_id)
         last_head = state.get('last_git_head')
         last_log_size = state.get('last_log_size')
 
@@ -431,23 +393,21 @@ def run_cycle(task_id: str, env: dict) -> None:
         else:
             git_changed = False
             tree_changed = False
-        log_changed = has_log_growth(task_id, last_log_size)
+        log_changed = has_log_growth(spec_path, task_id, last_log_size)
 
         if git_changed or tree_changed or log_changed:
             print(f"[cycle] Degraded: activity detected (git_head={git_changed}, tree={tree_changed}, log={log_changed}), waiting for next cycle")
         else:
             print(f"[cycle] Degraded: no activity signals, waiting for next cycle")
 
-    # Worker detection (both paths) — uses updated progress_checker_pid
     workers = get_worker_processes(task_id, progress_checker_pid)
     print(f"[cycle] Active workers: {len(workers)}")
     for w in workers:
         print(f"  PID={w['pid']} etime={w['etime_minutes']:.1f}min")
 
-    # Persist baseline values for next cycle
     current_head = get_current_git_head(project_dir) if project_dir else None
-    current_log_size = get_current_log_size(task_id)
-    save_state(task_id, current_head, current_log_size)
+    current_log_size = get_current_log_size(spec_path, task_id)
+    save_state(spec_path, task_id, current_head, current_log_size)
 
 
 # ---------------------------------------------------------------------------
@@ -455,26 +415,37 @@ def run_cycle(task_id: str, env: dict) -> None:
 # ---------------------------------------------------------------------------
 
 def cmd_init(task_id: str) -> None:
-    """Initialize state file."""
-    init_state_if_missing(task_id)
-    print(f"State initialized: {get_state_path(task_id)}")
+    try:
+        env = load_spec_env()
+        spec_path = find_spec_path(task_id, env)
+    except SpecEnvError:
+        spec_path = None
+    init_state_if_missing(spec_path, task_id)
+    print(f"State initialized: {get_state_path(spec_path, task_id)}")
 
 
 def cmd_status(task_id: str) -> None:
-    state = load_state(task_id)
-    if not state:
-        print(f"State file missing: {get_state_path(task_id)}")
+    try:
+        env = load_spec_env()
+        spec_path = find_spec_path(task_id, env)
+    except SpecEnvError:
+        spec_path = None
+
+    state_path = get_state_path(spec_path, task_id)
+    if not os.path.exists(state_path):
+        print(f"State file missing: {state_path}")
         return
+    state = load_state(spec_path, task_id)
     matches = get_all_matching_processes(task_id)
     print(f"Task {task_id} monitor state:")
     head = state.get('last_git_head', 'unknown')
     print(f"  Git HEAD: {head[:8] + '...' if head and head not in ('unknown', None) else head}")
     print(f"  Last check: {state.get('last_check_time', 'unknown')}")
-    print(f"  Log file: {get_log_path(task_id)}")
+    print(f"  Log file: {get_log_path(spec_path, task_id)}")
     print(f"  Matching processes: {len(matches)}")
     for m in matches:
         print(f"    PID {m['pid']}, {m['etime_minutes']:.1f} min")
-    print(f"  State file: {get_state_path(task_id)}")
+    print(f"  State file: {state_path}")
 
 
 def cmd_processes(task_id: str) -> None:
@@ -500,15 +471,16 @@ def cmd_stop(task_id: str) -> None:
     else:
         print("No matching processes found, nothing to kill.")
 
-    state_path = get_state_path(task_id)
-    if os.path.exists(state_path):
-        os.remove(state_path)
-        print(f"Removed: {state_path}")
+    try:
+        env = load_spec_env()
+        spec_path = find_spec_path(task_id, env)
+    except SpecEnvError:
+        spec_path = None
 
-    log_path = get_log_path(task_id)
-    if os.path.exists(log_path):
-        os.remove(log_path)
-        print(f"Removed: {log_path}")
+    for path in (get_state_path(spec_path, task_id), get_log_path(spec_path, task_id)):
+        if os.path.exists(path):
+            os.remove(path)
+            print(f"Removed: {path}")
 
     print("STOPPED: Cleanup complete")
 
@@ -527,7 +499,8 @@ if __name__ == '__main__':
 
     if command == 'cycle':
         env = load_spec_env()
-        init_state_if_missing(task_id)
+        spec_path = find_spec_path(task_id, env)
+        init_state_if_missing(spec_path, task_id)
         run_cycle(task_id, env)
     elif command == 'init':
         cmd_init(task_id)

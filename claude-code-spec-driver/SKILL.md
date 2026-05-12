@@ -95,12 +95,20 @@ Check the returned data:
 ls {WORKSPACE}/{DOC_DIR}/*<task_id>*/
 
 # Confirm project directory
-# 1. Check .project file
-cat {SPEC_PATH}/.project 2>/dev/null
-# 2. No .project -> list WORKSPACE directories for user to choose
+# 1. Check project_name field in progress.json
+python3 -c "import json; d=json.load(open('{SPEC_PATH}/progress.json')); print(d.get('project_name',''))" 2>/dev/null
+# 2. No project_name -> list WORKSPACE directories for user to choose
 ls {WORKSPACE}/
-# 3. Write after user confirmation
-echo "project_name" > {SPEC_PATH}/.project
+# 3. Write after user confirmation — update project_name in progress.json (atomic)
+python3 -c "
+import json, os
+p = '{SPEC_PATH}/progress.json'
+d = json.load(open(p)) if os.path.exists(p) else {}
+d['project_name'] = '{project_name}'
+tmp = p + '.tmp'
+json.dump(d, open(tmp,'w'), ensure_ascii=False, indent=2)
+os.replace(tmp, p)
+"
 
 # Check workspace
 cd {WORKSPACE}/{project_name} && git status --short
@@ -171,8 +179,8 @@ I have previously generated documents through spec-stateflow. Please continue de
 cd {PROJECT_DIR} && nohup {CLAUDE_CLI} \
   -p "{Step 3 generated prompt}" \
   --dangerously-skip-permissions \
-  >> /tmp/claude-spec-{task_id}.log 2>&1 &
-echo "Launched. Log: /tmp/claude-spec-{task_id}.log"
+  >> {SPEC_PATH}/worker.log 2>&1 &
+echo "Launched. Log: {SPEC_PATH}/worker.log"
 ```
 
 Where `{PROJECT_DIR}` and `{CLAUDE_CLI}` are dynamically obtained from spec-env.json, `{task_id}` is the numeric task ID.
@@ -203,7 +211,7 @@ After launch, proactively report to user:
 
 ```bash
 # View output (CJK characters may be garbled, look for key info)
-tail -50 /tmp/claude-spec-{task_id}.log
+tail -50 {SPEC_PATH}/worker.log
 
 # Check if matching claude processes exist
 ps -ewwo pid,etime,command | grep -v grep | grep claude | grep {task_id}
@@ -240,7 +248,7 @@ User says "Let Claude Code continue 586742", full execution:
 # Read from spec-env.json: WORKSPACE={WORKSPACE}, DOC_DIR=doc
 ls {WORKSPACE}/doc/*586742*/
 # -> {WORKSPACE}/doc/586742-remove-service-foundation-dependency/
-cat {WORKSPACE}/doc/586742-*/.project 2>/dev/null
+python3 -c "import json; d=json.load(open('{SPEC_PATH}/progress.json')); print(d.get('project_name',''))" 2>/dev/null
 # -> {project_name}
 cd {WORKSPACE}/{project_name} && git status --short
 
@@ -249,10 +257,10 @@ cd {WORKSPACE}/{project_name} && git status --short
 cd {WORKSPACE}/{project_name} && nohup {CLAUDE_CLI} \
   -p "I have previously generated documents through spec-stateflow..." \
   --dangerously-skip-permissions \
-  >> /tmp/claude-spec-586742.log 2>&1 &
+  >> {SPEC_PATH}/worker.log 2>&1 &
 
 # Step 5: Report log path + progress
-tail -50 /tmp/claude-spec-586742.log
+tail -50 {SPEC_PATH}/worker.log
 cd {WORKSPACE}/{project_name} && git log --oneline -5
 # To query progress: invoke spec-task-progress skill with task ID 586742
 ```

@@ -584,15 +584,17 @@ else
 fi
 ```
 
-### Step 10: Cleanup /tmp state files
+### Step 10: Cleanup /tmp control files
 
 ```bash
-rm -f /tmp/claude-monitor-*.json /tmp/claude-monitor-*.pid /tmp/claude-monitor-*.lock /tmp/claude-monitor-*-daemon.log /tmp/claude-spec-*.log
-echo "✅ /tmp state files cleaned up"
+rm -f /tmp/claude-monitor-*.pid /tmp/claude-monitor-*.lock
+echo "✅ /tmp control files cleaned up"
 ```
 
 If any file cannot be removed, warn and continue:
-> ⚠️ Could not remove some /tmp state files. They are harmless and will be cleaned up on next reboot.
+> ⚠️ Could not remove some /tmp control files. They are harmless and will be cleaned up on next reboot.
+
+> **Note**: Runtime data files (`monitor-state.json`, `worker.log`, `daemon.log`) live inside spec directories under `{WORKSPACE}/{DOC_DIR}` and are **not removed** — they belong to the spec's history. Delete them manually per spec if needed.
 
 ### Uninstall Completion Report
 
@@ -614,7 +616,7 @@ If any file cannot be removed, warn and continue:
     ✅ spec-stop-anchor.sh
     ✅ spec-state-guard.sh
     ✅ spec-session.json
-    ✅ /tmp state files
+    ✅ /tmp control files (pid, lock)
 
   ✅ Preserved:
     📁 Spec documents at {WORKSPACE}/{DOC_DIR} — untouched

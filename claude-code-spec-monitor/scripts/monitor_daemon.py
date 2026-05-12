@@ -3,15 +3,15 @@
 Claude Code Monitor Daemon
 
 File protocol:
-  /tmp/claude-monitor-{id}.pid      <- daemon PID (alive check / stop target)
-  /tmp/claude-monitor-{id}.lock     <- flock (prevents double-start; auto-released on crash)
-  /tmp/claude-monitor-{id}.json     <- daemon runtime state (managed by snapshot.py)
-  /tmp/claude-spec-{id}.log         <- Claude Code worker output
-  {SPEC_PATH}/progress.json         <- written by progress checker (LLM parse)
-  {SPEC_PATH}/checker.json          <- written by snapshot.py cycle (tracks progress checker PID)
+  /tmp/claude-monitor-{id}.pid       <- daemon PID (process control only)
+  /tmp/claude-monitor-{id}.lock      <- flock (double-start prevention)
+  {SPEC_PATH}/monitor-state.json     <- daemon runtime state + checker PID (managed by snapshot.py)
+  {SPEC_PATH}/worker.log             <- Claude Code worker output
+  {SPEC_PATH}/daemon.log             <- this daemon's stdout/stderr (nohup redirect)
+  {SPEC_PATH}/progress.json          <- written by progress checker (LLM parse); includes project_name
 
 Usage (run via nohup in background):
-  nohup python3 monitor_daemon.py <task_id> start >> /tmp/claude-monitor-<task_id>-daemon.log 2>&1 &
+  nohup python3 monitor_daemon.py <task_id> start >> {SPEC_PATH}/daemon.log 2>&1 &
   python3 monitor_daemon.py <task_id> stop
   python3 monitor_daemon.py <task_id> status
   python3 monitor_daemon.py <task_id> restart
@@ -37,14 +37,39 @@ _task_id = None
 # Path helpers
 # ---------------------------------------------------------------------------
 
-def paths(task_id):
-    return {
-        'pid':        f'/tmp/claude-monitor-{task_id}.pid',
-        'lock':       f'/tmp/claude-monitor-{task_id}.lock',
-        'state':      f'/tmp/claude-monitor-{task_id}.json',
-        'log':        f'/tmp/claude-spec-{task_id}.log',
-        'daemon_log': f'/tmp/claude-monitor-{task_id}-daemon.log',
+def _resolve_spec_path(task_id: str):
+    """Return SPEC_PATH for task_id via snapshot helpers, or None on failure."""
+    try:
+        import importlib.util
+        snap_spec = importlib.util.spec_from_file_location('snapshot', SNAPSHOT_PY)
+        snap_mod = importlib.util.module_from_spec(snap_spec)
+        snap_spec.loader.exec_module(snap_mod)
+        env = snap_mod.load_spec_env()
+        return snap_mod.find_spec_path(task_id, env)
+    except Exception:
+        return None
+
+
+def paths(task_id: str, spec_path=None):
+    """Return file paths. pid/lock are always in /tmp; data/log files live in SPEC_PATH.
+    Falls back to /tmp when spec_path cannot be resolved (e.g. test task IDs).
+    """
+    if spec_path is None:
+        spec_path = _resolve_spec_path(task_id)
+
+    p = {
+        'pid':  f'/tmp/claude-monitor-{task_id}.pid',
+        'lock': f'/tmp/claude-monitor-{task_id}.lock',
     }
+    if spec_path:
+        p['state']      = os.path.join(spec_path, 'monitor-state.json')
+        p['log']        = os.path.join(spec_path, 'worker.log')
+        p['daemon_log'] = os.path.join(spec_path, 'daemon.log')
+    else:
+        p['state']      = f'/tmp/claude-monitor-{task_id}.json'
+        p['log']        = f'/tmp/claude-spec-{task_id}.log'
+        p['daemon_log'] = f'/tmp/claude-monitor-{task_id}-daemon.log'
+    return p
 
 
 # ---------------------------------------------------------------------------

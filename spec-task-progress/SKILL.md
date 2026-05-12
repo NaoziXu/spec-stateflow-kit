@@ -109,11 +109,12 @@ Count tasks by scanning **only top-level list items** (lines starting with `- [m
 
 ## progress.json Schema
 
-Write exactly these 7 fields — no more, no fewer:
+Write exactly these 8 fields. Preserve `project_name` from the existing file if present; otherwise set to null.
 
 ```json
 {
   "task_id": "586742",
+  "project_name": "mas-workflow",
   "done": 4,
   "total": 10,
   "next_task": 5,
@@ -126,6 +127,7 @@ Write exactly these 7 fields — no more, no fewer:
 | Field | Type | Description |
 |-------|------|-------------|
 | `task_id` | string | The task ID as provided |
+| `project_name` | string \| null | Project directory name (e.g. `mas-workflow`); set by driver/monitor, preserved on update |
 | `done` | int | Count of [✓] + [⏭] tasks |
 | `total` | int | Total task count |
 | `next_task` | int \| null | Task number of next [ ] or [~] item; null if all done |
@@ -133,7 +135,7 @@ Write exactly these 7 fields — no more, no fewer:
 | `is_complete` | bool | true when done == total |
 | `updated_at` | string | ISO 8601 timestamp (seconds precision) |
 
-> **Note**: `progress_checker_pid`, `triggered_by`, `spawned_at` are maintained separately in `checker.json` by the daemon. Do NOT write these fields to `progress.json`.
+**`project_name` preservation rule**: When rewriting progress.json, read the existing file first. If it contains a non-null `project_name`, include that value in the new write. This field is owned by driver/monitor — the progress skill never sets it, only preserves it.
 
 **Atomic write**: write to `{SPEC_PATH}/progress.json.tmp` first, then rename to `progress.json`. This prevents partial reads by the daemon.
 

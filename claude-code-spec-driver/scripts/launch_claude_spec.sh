@@ -113,9 +113,30 @@ if [ "$WORKTREE_ENABLED" = "true" ] && [ -n "$TASK_ID" ]; then
 fi
 # --- Worktree 设置结束 ---
 
-# 日志文件：有 task-id 则用固定名（追加模式，与 monitor 约定一致）；否则用时间戳
+# 日志文件：有 task-id 则解析 SPEC_PATH 放到 spec 目录内；否则用时间戳落 /tmp
 if [ -n "$TASK_ID" ]; then
-    LOG_FILE="/tmp/claude-spec-${TASK_ID}.log"
+    SPEC_PATH=$(python3 -c "
+import json, os, glob, sys
+try:
+    env = json.load(open('$ENV_FILE', encoding='utf-8'))
+    spec_dir = os.path.join(env.get('WORKSPACE',''), env.get('DOC_DIR','doc'))
+    if not os.path.isdir(spec_dir):
+        sys.exit(1)
+    candidates = sorted(
+        [d for d in glob.glob(os.path.join(spec_dir, '*'))
+         if os.path.isdir(d) and os.path.basename(d).startswith('$TASK_ID')],
+        key=len
+    )
+    if candidates:
+        print(candidates[0])
+except Exception:
+    pass
+" 2>/dev/null)
+    if [ -n "$SPEC_PATH" ]; then
+        LOG_FILE="$SPEC_PATH/worker.log"
+    else
+        LOG_FILE="/tmp/claude-spec-${TASK_ID}.log"
+    fi
 else
     LOG_TS=$(date +%s)
     LOG_FILE="/tmp/claude-spec-output-${LOG_TS}.log"

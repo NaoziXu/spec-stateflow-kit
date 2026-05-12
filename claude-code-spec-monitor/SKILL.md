@@ -28,11 +28,12 @@ Paths are read from `{SKILLS_DIR}/../spec-env.json`:
 
 | File | Path | Purpose |
 |------|------|---------|
-| Daemon state | `/tmp/claude-monitor-<task_id>.json` | Daemon runtime state (git head, log size, last check time) |
-| Worker log | `/tmp/claude-spec-<task_id>.log` | Claude Code stdout/stderr |
-| Daemon log | `/tmp/claude-monitor-<task_id>-daemon.log` | Daemon stdout/stderr |
-| Progress | `{SPEC_PATH}/progress.json` | Written by progress checker (LLM parse); read by daemon |
-| Checker | `{SPEC_PATH}/checker.json` | Written by snapshot.py cycle; tracks progress checker PID |
+| Progress | `{SPEC_PATH}/progress.json` | Written by progress checker (LLM parse); includes `project_name` |
+| Daemon state | `{SPEC_PATH}/monitor-state.json` | Daemon runtime state (git head, log size, last check time, checker PID) |
+| Worker log | `{SPEC_PATH}/worker.log` | Claude Code stdout/stderr |
+| Daemon log | `{SPEC_PATH}/daemon.log` | Daemon stdout/stderr (nohup redirect) |
+| Daemon PID | `/tmp/claude-monitor-<task_id>.pid` | Process control only |
+| Lock | `/tmp/claude-monitor-<task_id>.lock` | flock double-start prevention |
 
 **Check interval: 15 min.** Worker processes identified by task_id pattern in command line — no PID files needed.
 
@@ -81,9 +82,9 @@ ls {WORKSPACE}/{DOC_DIR}/*<task_id>*
 # SPEC_PATH = matched directory full path
 
 # 2. Read or select project
-cat {SPEC_PATH}/.project 2>/dev/null \
+python3 -c "import json; d=json.load(open('{SPEC_PATH}/progress.json')); print(d.get('project_name',''))" 2>/dev/null \
   || (ls {WORKSPACE}/ && echo "Please select project directory")
-# If absent: echo "project_name" > {SPEC_PATH}/.project after user confirms
+# If absent: write project_name into progress.json after user confirms (atomic update)
 
 # 3. Check workspace
 cd {WORKSPACE}/{project_name} && git status --short
@@ -96,7 +97,7 @@ cd {WORKSPACE}/{project_name} && git status --short
 ```bash
 nohup python3 {SKILLS_DIR}/claude-code-spec-monitor/scripts/monitor_daemon.py \
   {task_id} start \
-  >> /tmp/claude-monitor-{task_id}-daemon.log 2>&1 &
+  >> {SPEC_PATH}/daemon.log 2>&1 &
 
 sleep 2
 python3 {SKILLS_DIR}/claude-code-spec-monitor/scripts/monitor_daemon.py {task_id} status
@@ -105,7 +106,7 @@ python3 {SKILLS_DIR}/claude-code-spec-monitor/scripts/monitor_daemon.py {task_id
 If daemon is NOT running after 2s, show log tail and abort:
 
 ```bash
-tail -20 /tmp/claude-monitor-{task_id}-daemon.log
+tail -20 {SPEC_PATH}/daemon.log
 # Inform user: "Daemon failed to start. See log above."
 ```
 
@@ -138,8 +139,8 @@ tail -20 /tmp/claude-monitor-{task_id}-daemon.log
 
 ```
 ✅ Monitoring started: {task_id} ({done}/{total}, {pct}%)
-   Worker log: /tmp/claude-spec-{task_id}.log
-   Daemon log: /tmp/claude-monitor-{task_id}-daemon.log
+   Worker log: {SPEC_PATH}/worker.log
+   Daemon log: {SPEC_PATH}/daemon.log
    Auto-check every 15 minutes
    💡 "monitor status" to check, "stop monitor {task_id}" to stop
 ```
@@ -189,8 +190,8 @@ Daemon:   running (PID=12345)
 Progress: 13/35 (from progress.json)
 Checked:  2026-01-15T10:30:00
 Workers:  1 matching process(es)
-Log:      /tmp/claude-spec-586742.log
-DaemonLog:/tmp/claude-monitor-586742-daemon.log
+Log:      {SPEC_PATH}/worker.log
+DaemonLog:{SPEC_PATH}/daemon.log
 ```
 
 If no PID files found: inform user "No monitoring tasks currently."
@@ -248,7 +249,7 @@ Always use `python3 monitor_daemon.py <id> stop` to cleanly shut down the daemon
 
 | Operation | Command |
 |-----------|---------|
-| Start monitoring | `nohup python3 monitor_daemon.py <id> start >> /tmp/claude-monitor-<id>-daemon.log 2>&1 &` |
+| Start monitoring | `nohup python3 monitor_daemon.py <id> start >> {SPEC_PATH}/daemon.log 2>&1 &` |
 | Stop monitoring | `python3 monitor_daemon.py <id> stop` |
 | Restart monitoring | `python3 monitor_daemon.py <id> restart` |
 | View status | `python3 monitor_daemon.py <id> status` |
@@ -256,8 +257,8 @@ Always use `python3 monitor_daemon.py <id> stop` to cleanly shut down the daemon
 | Run one cycle manually | `python3 snapshot.py <id> cycle` |
 | View snapshot state | `python3 snapshot.py <id> status` |
 | View worker processes | `python3 snapshot.py <id> processes` |
-| View worker log | `tail -f /tmp/claude-spec-<id>.log` |
-| View daemon log | `tail -f /tmp/claude-monitor-<id>-daemon.log` |
+| View worker log | `tail -f {SPEC_PATH}/worker.log` |
+| View daemon log | `tail -f {SPEC_PATH}/daemon.log` |
 
 ## Complete Example
 
@@ -274,7 +275,7 @@ User says "monitor 586742":
 # A2: Confirm project directory
 ls {WORKSPACE}/doc/*586742*/
 # → {WORKSPACE}/doc/586742-remove-service-foundation-dependency/
-cat {WORKSPACE}/doc/586742-*/.project
+python3 -c "import json; d=json.load(open('{SPEC_PATH}/progress.json')); print(d.get('project_name',''))"
 # → {project_name}
 cd {WORKSPACE}/{project_name} && git status --short
 # → clean
@@ -282,7 +283,7 @@ cd {WORKSPACE}/{project_name} && git status --short
 
 # A3: Launch daemon
 nohup python3 {SKILLS_DIR}/claude-code-spec-monitor/scripts/monitor_daemon.py \
-  586742 start >> /tmp/claude-monitor-586742-daemon.log 2>&1 &
+  586742 start >> {SPEC_PATH}/daemon.log 2>&1 &
 
 sleep 2
 python3 {SKILLS_DIR}/claude-code-spec-monitor/scripts/monitor_daemon.py 586742 status

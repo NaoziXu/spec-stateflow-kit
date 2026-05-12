@@ -43,12 +43,14 @@ def extract_task_id(dirname):
     return dirname
 
 def get_git_head(spec_path):
-    proj_file = os.path.join(spec_path, '.project')
     dirs_to_try = []
-    if os.path.isfile(proj_file):
+    prog_file = os.path.join(spec_path, 'progress.json')
+    if os.path.isfile(prog_file):
         try:
-            proj_name = open(proj_file).read().strip()
-            dirs_to_try.append(os.path.join(workspace, proj_name))
+            prog = json.load(open(prog_file, encoding='utf-8'))
+            proj_name = prog.get('project_name', '')
+            if proj_name:
+                dirs_to_try.append(os.path.join(workspace, proj_name))
         except Exception:
             pass
     dirs_to_try.append(workspace)
