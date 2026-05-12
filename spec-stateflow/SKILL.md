@@ -8,23 +8,6 @@ alwaysApply: false
 
 **Important: You must follow these rules. Each phase must be confirmed by the user before proceeding to the next phase.**
 
-## When to Use This Skill
-
-Use this skill for **structured development workflow** when you need to:
-
-- Develop new features from scratch
-- Design complex architecture
-- Integrate multiple modules
-- Ensure high-quality requirement analysis and acceptance criteria
-
-**Do NOT use for:**
-- Simple requirements
-- Simple bug fixes (single file / single method / obvious root cause)
-- Documentation updates
-- Configuration changes
-
-> **Fix vs Simple bug fix boundary**: A "Fix" task (use Spec) involves **cross-module impact**, **systematic tech debt**, or **requires design before coding**. A "Simple bug fix" (no Spec) is a **localized, obvious fix** in ≤1 file with no architectural implications.
-
 ## How to Use This Skill
 
 1. **Follow the four phases in order** — each phase requires user confirmation before proceeding:
@@ -38,7 +21,7 @@ Use this skill for **structured development workflow** when you need to:
 
 ## Path Convention
 
-All Spec files use the following placeholders. Actual paths are defined in the user's project configuration:
+All Spec files use the following placeholders. Actual paths are resolved from `~/.claude/spec-env.json` (WORKSPACE + DOC_DIR fields):
 
 | Placeholder | Meaning |
 |------------|---------|
@@ -58,11 +41,8 @@ All Spec files use the following placeholders. Actual paths are defined in the u
 
 | Your situation | Start here |
 |----------------|-----------|
-| New feature / complex task | **Phase 1** (full workflow: Phase 1 → 2 → 3 → 4) |
 | Ready to execute (user confirmed plan) | **Phase 4 → Quick Start** |
 | User authorized continuous batch / driver-monitor automation | **Phase 4 → [Continuous Operation Mode](#continuous-operation-mode)** |
-| Session compressed / interrupted | **Phase 4 → Compression Recovery** |
-| User says "updatecode" / "continue" / "resume" | **Phase 4 → Quick Start** (read tasks.md → locate breakpoint → continue) |
 
 > For all runtime states (error, context switch, task completion, etc.), see **Phase 4 → State Navigation**.
 
@@ -192,6 +172,18 @@ Every task in `{SPEC_PATH}/tasks.md` must contain the following fields:
 
 **Critical field — Specifics:** Must be precise down to method/field level. After session compression, recovery depends entirely on this field to reconstruct what was done and what remains.
 
+### Affected 字段：依赖影响参考
+
+填写 Affected 字段时，重点识别以下 5 类连带影响：
+
+| 影响类型 | 描述 | 示例 |
+|---------|------|------|
+| **API/接口变更** | 新增、修改或删除接口方法 | 调用方需更新方法签名、返回值类型 |
+| **模块依赖** | 跨模块数据流或调用链改变 | Service A 调用 Service B 的新方法 |
+| **数据模型** | 数据库表结构或 DTO 字段变化 | 新增字段需同步 ORM 映射和 DTO |
+| **配置项** | 环境变量、配置文件或常量变化 | 新配置项需在 spec-env.json 和文档中声明 |
+| **接口契约** | 对外暴露的 API 格式或行为约定变化 | 调用方（客户端/前端/外部系统）需同步更新 |
+
 **Status values:**
 - `[ ]` — Not started
 - `[~]` — In progress
@@ -200,33 +192,54 @@ Every task in `{SPEC_PATH}/tasks.md` must contain the following fields:
 
 ### Task Format Reference
 
+Tasks use a **dual-layer format**: an Overview list for machine parsing + `### Task N:` sections with Markdown tables for human-readable details.
+
 ```markdown
 # Implementation Plan
 
-- [✓] 1. Remove unused methods from IMultiAppInfo
-  - Scope: `IMultiAppInfoProxyInterface.java`, `MultiAppInfoProxy.java`
-  - Affected: `NoticeService.java`
-  - Specifics: Interface remove getCachedV2AppInfo(), listV1OfflineApps(); impl class sync
-  - Verification: grep signatures + compile verification
-  - Commit: feat(proxy): remove unused methods (a1b2c3d)
-  - User corrections: 0
-  - Notes: User requested keeping getV1AppInfo 3-param overload
-  - _Requirement: R1
+## Task Overview
 
+- [✓] 1. Remove unused methods from IMultiAppInfo
 - [ ] 2. Add getAppName method
-  - Scope: `IMultiAppInfoProxyInterface.java`, `MultiAppInfoProxy.java`
-  - Affected: —
-  - Specifics: Interface add getAppName(String); impl class add getAppName(String)
-  - Verification: —
-  - Commit: —
-  - User corrections: —
-  - Notes: Depends on task 1 completion
-  - _Requirement: R2
+
+---
+
+### Task 1: Remove unused methods from IMultiAppInfo
+
+| Field | Content |
+|-------|---------|
+| **Status** | `[✓]` |
+| **Scope** | `IMultiAppInfoProxyInterface.java`, `MultiAppInfoProxy.java` |
+| **Affected** | `NoticeService.java` |
+| **Specifics** | Interface remove getCachedV2AppInfo(), listV1OfflineApps(); impl class sync |
+| **Verification** | grep signatures + compile verification |
+| **Commit** | feat(proxy): remove unused methods (a1b2c3d) |
+| **User corrections** | 0 |
+| **Notes** | User requested keeping getV1AppInfo 3-param overload |
+| **Requirement** | R1 |
+
+---
+
+### Task 2: Add getAppName method
+
+| Field | Content |
+|-------|---------|
+| **Status** | `[ ]` |
+| **Scope** | `IMultiAppInfoProxyInterface.java`, `MultiAppInfoProxy.java` |
+| **Affected** | — |
+| **Specifics** | Interface add getAppName(String); impl class add getAppName(String) |
+| **Verification** | — |
+| **Commit** | — |
+| **User corrections** | — |
+| **Notes** | Depends on task 1 completion |
+| **Requirement** | R2 |
 ```
 
 ### Machine Parsing Contract
 
 生成或更新 `tasks.md` 时，任务状态标记仅允许使用 `[ ]` `[~]` `[✓]` `[⏭]` 四种形式，禁止使用任何 emoji 或其他字符替代。
+
+**双层同步规则：** Overview 列表中的状态标记与对应 `### Task N:` 表格中的 Status 字段必须保持一致。更新任务状态时，两处必须同步修改——先改 Overview 标记，再改表格 Status 字段（或同时修改）。不一致时，以 `### Task N:` 表格中的 Status 字段为权威值。
 
 > 注：格式约束仅限于能有效控制的范围——状态标记字符。其他格式细节（行结构、子字段格式等）由 spec-task-progress 的 LLM 解析能力兜底，不在此契约中强制。
 
@@ -394,11 +407,17 @@ Key reminders for execution:
 
 | Quick Step | Full Step Mapping |
 |-----------|------------------|
+| Fast session re-location via spec-session.json | Step 0 |
 | Read and confirm progress | Step 1 |
 | Verify code state | Step 2-3 |
 | Determine next step | Step 4-6 |
 
 #### Full Compression Recovery Flow (6 Steps)
+
+**Step 0: Fast Session Re-location (delegate to spec-router)**
+- spec-router handles Step 0 when user says "continue" / "updatecode" / "resume"
+- Step 0 reads `~/.claude/spec-session.json`, pre-loads task context, and either fast-forwards to Step 2 (fresh session) or falls through to Step 1 (stale/missing)
+- If spec-router Step 0 fast-forwarded here: proceed directly to Step 2 (skip Step 1 directory scan)
 
 **Step 1: Read Spec files, confirm `{SPEC_PATH}/tasks.md` progress**
 - Read `{SPEC_PATH}/requirements.md`, `{SPEC_PATH}/design.md`, `{SPEC_PATH}/tasks.md`
