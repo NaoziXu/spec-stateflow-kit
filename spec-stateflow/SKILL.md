@@ -272,19 +272,11 @@ First time with a confirmed `tasks.md`:
 
 #### Where Am I?
 
-```
-Received user instruction
-│
-├─ Is the scope clear and small? ──→ YES → Do NOT use this skill, execute directly
-│                                    NO
-├─ Does it need design/architecture? → YES → Plan first → Write tasks.md → Execute
-│                                    NO (unclear)
-└─ Investigate → Reclassify
-```
+> Task type classification is handled by spec-router before spec-stateflow is invoked. All states below assume a Complex or Fix task is already in progress.
 
 | Current State | What To Do Next | Key Output |
 |---------------|-----------------|------------|
-| Just received instruction | Classify task (simple / complex / fix / routine) → see Entry Points for entry decisions | Decision: plan or execute directly |
+| Just entered spec-stateflow | Determine entry point — see Entry Points table above | Phase 1 or Phase 4 |
 | Planning in progress (Phase 1-3) | Continue current phase → wait for user confirmation before next phase | Confirmed spec doc |
 | Ready to implement | Read `{SPEC_PATH}/tasks.md`, mark first pending task as `[~]` | Task in progress |
 | Just finished a task | Update `tasks.md` to `[✓]` → verify → commit → next task | Updated tracker |
@@ -312,11 +304,9 @@ When all tasks in `tasks.md` are `[✓]` or `[⏭]`:
 The State Navigation table is the primary reference. The flow diagram below illustrates the core state machine; all scenarios in the table are authoritative.
 
 ```
-[Classified] --(simple/routine)--> [Direct Execution] --> [Done]
-      │
-      └─(complex/fix)--> [Planning] --(confirmed)--> [Executing] --(task done)--> [Update tracker] --(more tasks)--> [Executing]
-                             │                                                                    └─(all done)--> [Complete]
-                             └─(rejected)--> [Revise plan]
+[Planning] --(confirmed)--> [Executing] --(task done)--> [Update tracker] --(more tasks)--> [Executing]
+    │                                                                     └─(all done)--> [Complete]
+    └─(rejected)--> [Revise plan]
 
 [Executing] --(error)--> [Diagnosing] --(fixed)--> [Update tracker] --> [Executing]
                                     └─(stuck)--> [Ask user] --(user responds)--> [Judge next step based on user's direction]
@@ -328,8 +318,6 @@ The State Navigation table is the primary reference. The flow diagram below illu
 [Any state] --(user corrects design assumption)--> [Update tasks.md + design.md] --> [Wait for confirmation]
 [Any state] --(session compressed/interrupted)--> [Recovery] --(tracker reconciled)--> [Resume prior state]
 ```
-
-> **Scope note:** The diagram above covers only tasks that enter the Spec workflow (Complex / Fix). Simple and Routine tasks are executed directly without entering this state machine.
 
 **Critical rule:** You cannot transition from `[Executing]` to the next task without updating the tracker. Updating `tasks.md` is the **definition** of task completion.
 
@@ -418,8 +406,7 @@ Reverts to Default Mode immediately on:
 - `tasks.md` is the **only trustworthy state source** — summary progress descriptions are NOT reliable
 - **Special cases:**
   - **If Spec files don't exist:**
-    - If context indicates a Simple task (no requirement ID, no Spec): run `git status` and `git diff`, determine progress from working tree state, continue directly
-    - Otherwise (Complex/Fix): Spec planning hasn't started. Re-run "Where Am I?" classification
+    - Spec planning hasn't started. Ask user to confirm task scope, then begin Phase 1.
   - **If files exist but `tasks.md` is missing:** Rebuild `tasks.md` from `design.md`, note in remarks "table rebuilt after compression recovery"
   - **If all files exist:** Proceed to Step 2
 
