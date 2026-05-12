@@ -375,12 +375,6 @@ Reverts to Default Mode immediately on:
 
 `{SPEC_PATH}/tasks.md` is the primary state reference. If memory, conversation, and tracker disagree, **pause and reconcile with the user** — never silently override user intent.
 
-Key reminders for execution:
-
-- **Specifics is the most critical field** — must be precise down to method/field level; after session compression, recovery depends entirely on this field
-- **Status values:** `[ ]` Not started / `[~]` In progress (set **before** editing code) / `[✓]` Done (set **before** committing) / `[⏭]` Skipped (user decision only)
-- **User corrections:** ≥2 triggers escalation (user's project configuration defines the escalation behavior)
-
 #### Timeliness Guarantee
 
 `{SPEC_PATH}/tasks.md` must be updated in real time — never retroactively:
@@ -466,12 +460,3 @@ Key reminders for execution:
 
 **When returning to a previous task, re-verify state.** Verify the last `[✓]` row per Step 2 of Compression Recovery.
 
----
-
-## Key Principles
-
-1. **[HIGHEST PRIORITY]Real-Time Task Tracking** — Updating `{SPEC_PATH}/tasks.md` is the definition of task completion; it takes precedence over all other operations
-2. **User Confirmation Required** — Each phase must be confirmed by the user before proceeding to the next
-3. **Tracker is truth** — When memory conflicts with tracker, trust the tracker; pause and reconcile with the user on conflicts
-4. **Verify with tools** — Prefer programmatic verification (grep, diff, compiler); never rely on reading or memory for precision questions
-5. **Cross-check conclusions** — Any conclusion from indirect observation must be independently verified
