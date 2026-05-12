@@ -1,6 +1,6 @@
 ---
 name: spec-router
-description: "Always-active spec workflow router. Classifies tasks, maps commands, and resolves paths from ~/.claude/spec-env.json. Loaded in every session."
+description: "Always-active spec workflow router — loaded every session. Routes all user requests: classifies tasks (Complex/Fix/Simple/Routine), handles continue/resume via Step 0 fast-path recovery, and resolves SPEC_DIR/SPEC_PATH from ~/.claude/spec-env.json. Activated on any dev task, 'continue', 'resume', 'check progress', or 'task status'."
 alwaysApply: true
 ---
 
