@@ -36,6 +36,15 @@ WORKSPACE=$(read_json_field "$ENV_FILE" "WORKSPACE")
 DOC_DIR=$(read_json_field "$ENV_FILE" "DOC_DIR")
 CLAUDE_CLI=$(read_json_field "$ENV_FILE" "CLAUDE_CLI")
 
+# 读取可选 worktree 开关（默认 false）
+WORKTREE_ENABLED=$(python3 -c "
+import json, sys
+try:
+    d = json.load(open('$ENV_FILE'))
+    print('true' if d.get('worktree', False) else 'false')
+except: print('false')
+")
+
 # 参数解析
 TASK_ID=""
 PROJECT_DIR=""
@@ -71,6 +80,39 @@ if ! command -v "$CLAUDE_CLI" &>/dev/null; then
     exit 1
 fi
 
+# --- Worktree 设置（可选，由 spec-env.json worktree 字段控制）---
+EFFECTIVE_DIR="$PROJECT_DIR"
+
+if [ "$WORKTREE_ENABLED" = "true" ] && [ -n "$TASK_ID" ]; then
+    WORKTREE_PATH="${PROJECT_DIR}/.worktrees/spec-${TASK_ID}"
+    echo "Worktree 模式已启用"
+
+    if [ -d "$WORKTREE_PATH" ]; then
+        wt_status=$(cd "$WORKTREE_PATH" && git status --short 2>/dev/null || echo "ERROR")
+        if [ "$wt_status" = "ERROR" ]; then
+            echo "错误：无法检查已有 worktree 的 git 状态：$WORKTREE_PATH" >&2
+            exit 1
+        fi
+        if [ -n "$wt_status" ]; then
+            echo "错误：已有 worktree 存在未提交变更：" >&2
+            echo "$wt_status" >&2
+            echo "请手动处理未提交变更后重试。" >&2
+            exit 1
+        fi
+        echo "复用已有 worktree：$WORKTREE_PATH"
+    else
+        git -C "$PROJECT_DIR" worktree add "$WORKTREE_PATH" -b "spec/${TASK_ID}" 2>&1 || {
+            echo "错误：无法在 $WORKTREE_PATH 创建 worktree" >&2
+            echo "常见原因：分支 'spec/${TASK_ID}' 已存在，或路径冲突。" >&2
+            exit 1
+        }
+        echo "已创建 worktree：$WORKTREE_PATH"
+    fi
+    echo "Worktree: $WORKTREE_PATH"
+    EFFECTIVE_DIR="$WORKTREE_PATH"
+fi
+# --- Worktree 设置结束 ---
+
 # 日志文件：有 task-id 则用固定名（追加模式，与 monitor 约定一致）；否则用时间戳
 if [ -n "$TASK_ID" ]; then
     LOG_FILE="/tmp/claude-spec-${TASK_ID}.log"
@@ -80,13 +122,13 @@ else
 fi
 
 # 启动 Claude Code
-cd "$PROJECT_DIR"
+cd "$EFFECTIVE_DIR"
 if [ -n "$TASK_ID" ]; then
-    nohup "$CLAUDE_CLI" -p "$PROMPT" --dangerously-skip-permissions \
+    nohup "$CLAUDE_CLI" -p "$PROMPT" \
         $EXTRA_ARGS \
         >> "$LOG_FILE" 2>&1 &
 else
-    nohup "$CLAUDE_CLI" -p "$PROMPT" --dangerously-skip-permissions \
+    nohup "$CLAUDE_CLI" -p "$PROMPT" \
         $EXTRA_ARGS \
         > "$LOG_FILE" 2>&1 &
 fi
