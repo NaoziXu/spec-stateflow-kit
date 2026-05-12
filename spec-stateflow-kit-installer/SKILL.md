@@ -1,6 +1,6 @@
 ---
 name: spec-stateflow-kit-installer
-description: "Install or uninstall the Spec Stateflow Kit. Triggers: install spec kit, uninstall spec, spec-stateflow-kit-installer, initialize spec, remove spec, 安装spec, 卸载spec, 初始化spec, test installer, 测试 installer, test spec-installer, verify installer. Manages skills, spec-env.json, CLAUDE.md injection (auto language detection), and spec-stateflow."
+description: "Install or uninstall the Spec Stateflow Kit. Triggers: install spec kit, uninstall spec, spec-stateflow-kit-installer, initialize spec, remove spec, 安装spec, 卸载spec, 初始化spec, test installer, 测试 installer, test spec-installer, verify installer. Manages skills, spec-env.json, hook scripts (spec-stop-anchor.sh, spec-state-guard.sh), spec-router, and settings.json allowedTools."
 alwaysApply: false
 ---
 
@@ -31,7 +31,7 @@ If your product's skills directory is not immediately obvious from self-knowledg
 - `~/.cursor/skills/` (Cursor agent)
 - `~/skills/` (generic fallback)
 
-> ⚠️ Do NOT use `~/.claude/skills/` as SKILLS_DIR. That directory belongs to Claude Code and is where this installer deploys the Claude Code–side skills in Step 7. Using it as SKILLS_DIR would collapse the claw-side and Claude Code-side skill namespaces into one directory, breaking path resolution for both.
+> ⚠️ Do NOT use `~/.claude/skills/` as SKILLS_DIR. That directory belongs to Claude Code and is where this installer deploys the Claude Code–side skills in Step 5. Using it as SKILLS_DIR would collapse the claw-side and Claude Code-side skill namespaces into one directory, breaking path resolution for both.
 
 **Step 4 — Last resort (non-technical user prompt):**
 If all above steps fail, ask the user in plain language — no jargon, no path syntax:
@@ -49,11 +49,14 @@ Use the user's answer to infer the path. Expand `~` and verify the directory exi
 | spec-task-progress | `{SKILLS_DIR}/` | Progress query skill |
 | claude-code-spec-driver | `{SKILLS_DIR}/` | Drive Claude Code to continue development |
 | claude-code-spec-monitor | `{SKILLS_DIR}/` | Monitor guard (stall restart / completion stop) |
-| spec-env.json | `{SKILLS_DIR}/../` | Centralized path configuration |
-| claude.md spec content | `~/.claude/CLAUDE.md` | Spec-related rules — decision & workflow (auto-translated to match CLAUDE.md language) |
-| claude-reference.md | `~/.claude/CLAUDE-reference.md` | Spec-related reference — dependency analysis, code standards, quality standards (auto-translated, same language as CLAUDE.md) |
+| spec-env.json (claw side) | `{SKILLS_DIR}/../` | Centralized path configuration (claw side) |
+| spec-env.json (Claude Code side) | `~/.claude/` | Centralized path configuration (Claude Code side) |
 | spec-stateflow | `~/.claude/skills/` | Claude Code side spec workflow skill |
-| spec-task-progress（Claude Code 侧） | `~/.claude/skills/` | Claude Code 进度查询 skill（daemon spawn 时使用） |
+| spec-task-progress (Claude Code side) | `~/.claude/skills/` | Claude Code progress query skill (daemon spawn) |
+| spec-router | `~/.claude/skills/` | Always-active routing skill (alwaysApply: true) |
+| spec-stop-anchor.sh | `~/.claude/scripts/` | Stop Hook — snapshots active spec task context |
+| spec-state-guard.sh | `~/.claude/scripts/` | PostToolUse Hook — validates tasks.md transitions |
+| settings.json entries | `~/.claude/settings.json` | hooks (Stop + PostToolUse) + allowedTools whitelist |
 
 ## Decision Routing
 
@@ -81,8 +84,9 @@ ls "{KIT_DIR}/spec-task-progress" \
    "{KIT_DIR}/claude-code-spec-driver" \
    "{KIT_DIR}/claude-code-spec-monitor" \
    "{KIT_DIR}/spec-stateflow" \
-   "{KIT_DIR}/spec-stateflow-kit-installer/claude-sample.md" \
-   "{KIT_DIR}/spec-stateflow-kit-installer/claude-reference-sample.md"
+   "{KIT_DIR}/spec-router/SKILL.md" \
+   "{KIT_DIR}/spec-stateflow-kit-installer/scripts/spec-stop-anchor.sh" \
+   "{KIT_DIR}/spec-stateflow-kit-installer/scripts/spec-state-guard.sh"
 ```
 
 | Result | Action |
@@ -142,11 +146,31 @@ which claude && claude --version
 {
   "WORKSPACE": "{user specified}",
   "DOC_DIR": "{DOC_DIR_name confirmed in Q2, e.g. 'doc'}",
-  "CLAUDE_CLI": "{auto-detected or user specified}"
+  "CLAUDE_CLI": "{auto-detected or user specified}",
+  "allowed_bash_patterns": [],
+  "worktree": false
 }
 ```
 
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `WORKSPACE` | string | required | Workspace root directory |
+| `DOC_DIR` | string | `"doc"` | Spec document directory name (relative to WORKSPACE) |
+| `CLAUDE_CLI` | string | auto-detected | Claude Code CLI path |
+| `allowed_bash_patterns` | string[] | `[]` | Extra Bash allowedTools patterns (e.g. `"gradle build *"`) |
+| `worktree` | bool | `false` | Enable git worktree isolation for spec execution |
+
 > ⚠️ `DOC_DIR` is a **directory name** (e.g. `"doc"`), not a full path. All skills compute the full path as `{WORKSPACE}/{DOC_DIR}` at runtime.
+
+**Sync spec-env.json to Claude Code side:**
+
+```bash
+mkdir -p ~/.claude
+cp "{SKILLS_DIR}/../spec-env.json" ~/.claude/spec-env.json
+echo "✅ spec-env.json synced to ~/.claude/spec-env.json"
+```
+
+Note: Two independent copies (not a symlink). If the user manually edits `{SKILLS_DIR}/../spec-env.json`, re-run the installer's "update path config" step to sync.
 
 ### Step 3: Install Skills
 
@@ -197,7 +221,7 @@ Check the exit code:
    > - Python 3 not available at `python3`
    >
    > Fix the issue, then uninstall and re-run the installer to retry.
-3. **Continue with Steps 4–7** — other components (claude.md, spec-stateflow, etc.) install normally.
+3. **Continue with Steps 4–7** — other components install normally.
 
 ### Step 4: Post-Installation Path Validation
 
@@ -205,7 +229,7 @@ Check the exit code:
 [4/7] Validating installation paths...
 ```
 
-This phase verifies the path arithmetic is correct before writing CLAUDE.md.
+This phase verifies the path arithmetic is correct before continuing.
 
 **Check 1 — Path alignment (CRITICAL):**
 
@@ -253,153 +277,13 @@ Failure → warn, continue.
 ✅ WORKSPACE：存在
 ```
 
-### Step 5: Configure Claude Code — claude.md (with language auto-detection + path-resolution prefix)
+### Step 5: Install Claude Code Skills
 
 ```
-[5/7] Configuring Claude Code (claude.md)...
+[5/7] Installing Claude Code skills...
 ```
 
-1. Read `~/.claude/CLAUDE.md` (create empty file if not exists).
-2. **Detect existing kit injection** by searching for the marker `<!-- SPEC_STATEFLOW_KIT_BEGIN -->`.
-3. If marker present → prompt `Spec config already exists (BEGIN/END marker found), overwrite? (y/n)`:
-   - User confirms → remove the existing block (everything from `<!-- SPEC_STATEFLOW_KIT_BEGIN -->` through `<!-- SPEC_STATEFLOW_KIT_END -->`, inclusive) before continuing.
-   - User declines → skip Step 5 entirely.
-4. **Auto-detect language** by analysing the (post-removal) text content of `~/.claude/CLAUDE.md`:
-   - Calculate CJK ratio using this logic:
-     ```python
-     import re
-     content = open(os.path.expanduser("~/.claude/CLAUDE.md")).read()
-     cjk_pattern = re.compile(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]')
-     non_ws = re.sub(r'\s', '', content)
-     cjk_count = len(cjk_pattern.findall(non_ws))
-     ratio = cjk_count / len(non_ws) if non_ws else 0
-     is_cjk = ratio > 0.3
-     ```
-   - `is_cjk == True` → target language is CJK (translate to Chinese).
-   - `is_cjk == False` → target language is English.
-   - CLAUDE.md is empty/new (no non-whitespace content after removal): look at the language of the user's current installation request instead — if the user wrote in Chinese (CJK characters present in the request), use CJK; otherwise default to English.
-5. **Read `claude-sample.md`** from `{KIT_DIR}/spec-stateflow-kit-installer/`.
-   - CJK target → translate the ENTIRE body to Chinese while preserving markdown structure, code blocks, and **placeholders verbatim**.
-   - English target → use as-is.
-   - **Critical: do NOT substitute placeholders in the body.** `{SPEC_DIR}`, `{SPEC_NAME}`, `{SPEC_PATH}`, `{CLAUDE_CLI}`, `{WORKSPACE}`, `{DOC_DIR}` must remain as literal text. The body teaches their meaning; the path-resolution prefix (built next) supplies the actual values.
-6. **Build the path-resolution prefix block** using values from `{SKILLS_DIR}/../spec-env.json`. This is the only place where actual paths are filled in.
-
-   English form:
-   ```markdown
-   ## Spec Path Resolution
-
-   | Placeholder | Meaning | Actual Value |
-   |-------------|---------|--------------|
-   | `{SPEC_DIR}` | Spec file root directory | `<WORKSPACE>/<DOC_DIR>/` |
-   | `{SPEC_NAME}` | Current Spec name (varies per task) | `<TaskID>-<TaskDescription>` |
-   | `{SPEC_PATH}` | Full path | `{SPEC_DIR}/{SPEC_NAME}` |
-   | `{CLAUDE_CLI}` | Claude Code CLI binary | `<CLAUDE_CLI>` |
-   ```
-
-   CJK form:
-   ```markdown
-   ## Spec 路径解析
-
-   | 占位符 | 含义 | 实际值 |
-   |-------|------|-------|
-   | `{SPEC_DIR}` | Spec 文件根目录 | `<WORKSPACE>/<DOC_DIR>/` |
-   | `{SPEC_NAME}` | 当前 Spec 名称（按任务变化） | `<TaskID>-<TaskDescription>` |
-   | `{SPEC_PATH}` | 完整路径 | `{SPEC_DIR}/{SPEC_NAME}` |
-   | `{CLAUDE_CLI}` | Claude Code CLI 程序 | `<CLAUDE_CLI>` |
-   ```
-
-   Substitute `<WORKSPACE>`, `<DOC_DIR>`, `<CLAUDE_CLI>` with the literal values from `spec-env.json`. Left-column entries stay as `{...}` text — they are the symbolic names the body refers to. `{SPEC_NAME}` and `{SPEC_PATH}` actual-value cells stay symbolic because they vary per task.
-7. **Append the marker-wrapped block** to `~/.claude/CLAUDE.md`:
-
-   ```
-   <!-- SPEC_STATEFLOW_KIT_BEGIN -->
-   {path-resolution prefix block from step 6}
-
-   {translated claude-sample.md body from step 5, placeholders kept verbatim}
-   <!-- SPEC_STATEFLOW_KIT_END -->
-   ```
-
-   The BEGIN/END markers are mandatory; uninstall depends on them — never omit.
-
-   **Encoding safety — CRITICAL for CJK content:**
-   When writing CJK (Chinese/Japanese/Korean) text to `~/.claude/CLAUDE.md`, some agent write tools may corrupt UTF-8 characters. To prevent garbled output, use **one of these safe write methods** (in order of preference):
-
-   **Method A — `cat` heredoc (safest for bash):**
-   ```bash
-   cat <<'EOF' >> ~/.claude/CLAUDE.md
-   <!-- SPEC_STATEFLOW_KIT_BEGIN -->
-   {content here}
-   <!-- SPEC_STATEFLOW_KIT_END -->
-   EOF
-   ```
-
-   **Method B — Python with explicit UTF-8:**
-   ```bash
-   python3 -c "
-   import codecs
-   content = '''{escaped_content}'''
-   with codecs.open('$HOME/.claude/CLAUDE.md', 'a', 'utf-8') as f:
-       f.write(content)
-   "
-   ```
-
-   **Method C — `printf` with escape sequences (fallback):**
-   ```bash
-   printf '%s\n' '{line1}' '{line2}' ... >> ~/.claude/CLAUDE.md
-   ```
-
-   > ⚠️ **Avoid direct agent `Write` tool for CJK content** unless you have verified it handles UTF-8 correctly. If the written file shows方块/乱码 when read back with `cat`, the encoding was corrupted — re-write using Method A or B above.
-
-### Step 6: Configure Claude Code — claude-reference.md (same language as CLAUDE.md + path-resolution prefix)
-
-```
-[6/7] Configuring Claude Code (claude-reference.md)...
-```
-
-1. Read `claude-reference-sample.md` from `{KIT_DIR}/spec-stateflow-kit-installer/` (English base template).
-2. Use the same target language detected in Step 5:
-   - CJK → translate the ENTIRE body to Chinese while preserving markdown structure, code blocks, and **placeholders verbatim**.
-   - English → use as-is.
-3. **Critical: do NOT substitute placeholders in the body.** `{SPEC_DIR}`, `{SPEC_NAME}`, `{SPEC_PATH}`, `{CLAUDE_CLI}` etc. must remain as literal text — same rule as Step 5. The path-resolution prefix block (built next) supplies the actual values.
-4. **Build the path-resolution prefix block** using the same template and values from `spec-env.json` — same English/CJK forms shown in Step 5 sub-step 6 above, chosen based on detected language.
-5. Check if `~/.claude/CLAUDE-reference.md` exists.
-   - Yes → prompt `⚠️ CLAUDE-reference.md already exists, overwrite? (y/n)` → skip Step 6 if declined.
-6. **Write the file** with this layout (the entire file IS the kit injection — no inline markers needed because uninstall removes the whole file):
-
-   ```
-   {path-resolution prefix block built in step 6 item 4 above}
-
-   {translated claude-reference-sample.md body from step 2, placeholders kept verbatim}
-   ```
-
-   **Encoding safety — same rule as Step 5:**
-   For CJK content, do **not** rely on direct agent file-write tools. Use one of the safe methods from Step 5 (heredoc `cat`, Python with `codecs.open(..., 'utf-8')`, or `printf`). Since this is a full file overwrite (not append), use `'w'` mode instead of `'a'`:
-
-   ```bash
-   cat <<'EOF' > ~/.claude/CLAUDE-reference.md
-   {content here}
-   EOF
-   ```
-
-   Or with Python:
-   ```bash
-   python3 -c "
-   import codecs
-   content = '''{escaped_content}'''
-   with codecs.open('$HOME/.claude/CLAUDE-reference.md', 'w', 'utf-8') as f:
-       f.write(content)
-   "
-   ```
-
-7. Report: `✅ claude-reference.md installed (language: {detected_language})`
-
-### Step 7: Install spec-stateflow + spec-task-progress to Claude Code
-
-```
-[7/7] Installing spec-stateflow + spec-task-progress (Claude Code side)...
-```
-
-This step installs **two** skills to `~/.claude/skills/`. Both are required — do not stop after the first.
+This step installs **three** skills to `~/.claude/skills/`. All parts must be executed.
 
 **Part A — spec-stateflow:**
 
@@ -412,13 +296,76 @@ This step installs **two** skills to `~/.claude/skills/`. Both are required — 
 **Part B — spec-task-progress (Claude Code side, REQUIRED):**
 
 > This is the Claude Code–side copy of the progress skill. When the daemon spawns Claude Code via `claude -p`, Claude Code must be able to load this skill from `~/.claude/skills/`. The claw-side copy in `{SKILLS_DIR}/spec-task-progress/` is separate and serves a different purpose. Both must exist.
->
-> In Claude Code context, this skill resolves `SPEC_DIR` by reading the `Spec 路径解析` table in `~/.claude/CLAUDE.md` (injected in Step 5). No hardcoded paths are used — path resolution is always dynamic at runtime.
 
 6. Check if `~/.claude/skills/spec-task-progress/` exists
 7. If exists → ask "⚠️ spec-task-progress already exists in Claude Code skills, overwrite? (y/n)" → skip if declined
 8. Copy: `cp -r {KIT_DIR}/spec-task-progress/ ~/.claude/skills/spec-task-progress/`
 9. Report: `✅ spec-task-progress → ~/.claude/skills/spec-task-progress/`
+
+**Part C — spec-router (REQUIRED, alwaysApply):**
+
+10. Check if `~/.claude/skills/spec-router/` exists
+11. If exists → ask "⚠️ spec-router already exists, overwrite? (y/n)" → skip if declined
+12. Copy: `cp -r {KIT_DIR}/spec-router/ ~/.claude/skills/spec-router/`
+13. Report: `✅ spec-router → ~/.claude/skills/spec-router/  [alwaysApply]`
+
+### Step 6: Install Hook Scripts
+
+```
+[6/7] Installing hook scripts...
+```
+
+```bash
+mkdir -p ~/.claude/scripts
+```
+
+For each script in `{KIT_DIR}/spec-stateflow-kit-installer/scripts/`:
+
+1. If `~/.claude/scripts/{script}` exists → ask "⚠️ {script} already exists, overwrite? (y/n)" → skip if declined
+2. Copy: `cp {KIT_DIR}/spec-stateflow-kit-installer/scripts/{script} ~/.claude/scripts/`
+3. Set executable: `chmod +x ~/.claude/scripts/{script}`
+4. Report: `✅ {script} → ~/.claude/scripts/`
+
+### Step 7: Configure settings.json
+
+```
+[7/7] Configuring ~/.claude/settings.json...
+```
+
+Load or create `~/.claude/settings.json` (create as `{}` if not exists). Then merge the following entries using Python:
+
+**Hook entries to add:**
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {"command": "~/.claude/scripts/spec-stop-anchor.sh"}
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "command": "~/.claude/scripts/spec-state-guard.sh"
+      }
+    ]
+  }
+}
+```
+
+**allowedTools entries to add:**
+
+Base kit tools:
+```
+Read, Write, Edit, Glob, Grep,
+Bash(git *), Bash(find *), Bash(ls *), Bash(cat *), Bash(python3 *), Bash(npm run *)
+```
+
+Also merge any patterns from `spec-env.json` `allowed_bash_patterns` array.
+
+**Merge rules:**
+- Existing hook with same `command` string → prompt user "⚠️ hook already exists, overwrite? (y/n)", default: keep existing
+- Duplicate `allowedTools` entry (exact string match) → silently skip
+- Report: `✅ settings.json: N hook entries added, M allowedTools entries added`
 
 ### Install Completion Report
 
@@ -430,7 +377,7 @@ This step installs **two** skills to `~/.claude/skills/`. Both are required — 
   🔧 Claude Code: {CLAUDE_CLI}
   📂 Skills dir: {SKILLS_DIR}
 
-  Installed Skills:
+  Installed Skills (claw side):
     ✅ spec-stateflow-kit-installer
     ✅ spec-task-progress
     ✅ claude-code-spec-driver
@@ -438,16 +385,23 @@ This step installs **two** skills to `~/.claude/skills/`. Both are required — 
     [or]
     ⚠️ claude-code-spec-monitor  REMOVED — self-test failed (see above)
 
-  Validated:
-    ✅ spec-env.json → {SKILLS_DIR}/../spec-env.json
-    ✅ Path alignment correct
-    ✅ Scripts load spec-env.json successfully
-
-  Configured:
-    ✅ claude.md spec content injected (language: {detected_language})
-    ✅ claude-reference.md installed (language: {detected_language})
+  Installed Skills (Claude Code side):
     ✅ spec-stateflow → ~/.claude/skills/spec-stateflow/
     ✅ spec-task-progress → ~/.claude/skills/spec-task-progress/
+    ✅ spec-router → ~/.claude/skills/spec-router/  [alwaysApply]
+
+  Configured:
+    ✅ spec-env.json → ~/.claude/spec-env.json (path resolution unified)
+    ✅ spec-stop-anchor.sh → ~/.claude/scripts/
+    ✅ spec-state-guard.sh → ~/.claude/scripts/
+    ✅ settings.json: Stop hook + PostToolUse hook added
+    ✅ settings.json: allowedTools {N} entries added
+
+  Validated:
+    ✅ spec-env.json path alignment correct
+    ✅ Scripts load spec-env.json successfully
+    ✅ CLAUDE_CLI: {version}
+    ✅ WORKSPACE: exists
 
   💡 Say "check task progress" to start using
 ```
@@ -465,8 +419,8 @@ Remove all spec-related components from the system. Your spec documents in `{WOR
 ```
 Checking for spec kit components...
 
-  [claw-side]
-  spec-env.json:                     {found at {SKILLS_DIR}/../spec-env.json / not found}
+  [claw side]
+  spec-env.json (claw):              {found at {SKILLS_DIR}/../spec-env.json / not found}
   spec-task-progress:                {found at {SKILLS_DIR}/spec-task-progress/ / not found}
   claude-code-spec-driver:           {found at {SKILLS_DIR}/claude-code-spec-driver/ / not found}
   claude-code-spec-monitor:          {found at {SKILLS_DIR}/claude-code-spec-monitor/ / not found}
@@ -475,13 +429,19 @@ Checking for spec kit components...
   [Claude Code side]
   spec-stateflow:                    {found at ~/.claude/skills/spec-stateflow/ / not found}
   spec-task-progress (Claude Code):  {found at ~/.claude/skills/spec-task-progress/ / not found}
-  claude.md spec content:            {found (markers present) / not found}
-  CLAUDE-reference.md:               {found at ~/.claude/CLAUDE-reference.md / not found}
+  spec-router:                       {found at ~/.claude/skills/spec-router/ / not found}
+  spec-env.json (Claude Code):       {found at ~/.claude/spec-env.json / not found}
+  spec-stop-anchor.sh:               {found at ~/.claude/scripts/spec-stop-anchor.sh / not found}
+  spec-state-guard.sh:               {found at ~/.claude/scripts/spec-state-guard.sh / not found}
+  settings.json hook entries:        {found N entries / not found}
+  settings.json allowedTools:        {found N entries / not found}
+  spec-session.json:                 {found at ~/.claude/spec-session.json / not found}
 
   [Running processes]
   monitor daemon:                    {running (PID {pid}) / not running}
 
   ✅ Your spec documents at {WORKSPACE}/{DOC_DIR} will NOT be removed.
+  ✅ ~/.claude/CLAUDE.md will NOT be modified.
 
 ⚠️ This will remove ALL listed components including the installer itself.
    After removal, re-install by telling the agent the original kit path again.
@@ -492,7 +452,7 @@ User declines → abort.
 
 ### Step 2: Stop Running Monitor Processes
 
-Stop all running monitor daemon instances **before** deleting any skill files. Deleting scripts while a daemon is running leaves orphan processes with no kill handle.
+Stop all running monitor daemon instances **before** deleting any skill files.
 
 ```bash
 for pid_file in /tmp/claude-monitor-*.pid; do
@@ -509,17 +469,14 @@ for pid_file in /tmp/claude-monitor-*.pid; do
 done
 ```
 
-If a process cannot be killed:
-> ⚠️ Could not stop monitor process {PID}. It may be a zombie or owned by another user. Proceeding with file removal. You may need to manually kill it (`kill -9 {PID}`) or reboot.
-
-### Step 3: Remove spec-env.json
+### Step 3: Remove spec-env.json (claw side)
 
 ```bash
 rm -f "{SKILLS_DIR}/../spec-env.json"
-echo "✅ spec-env.json removed"
+echo "✅ spec-env.json (claw side) removed"
 ```
 
-### Step 4: Remove Skills (claw-side)
+### Step 4: Remove Skills (claw side)
 
 ```bash
 for skill in spec-task-progress claude-code-spec-driver claude-code-spec-monitor spec-stateflow-kit-installer; do
@@ -532,9 +489,9 @@ for skill in spec-task-progress claude-code-spec-driver claude-code-spec-monitor
 done
 ```
 
-### Step 5: Remove spec-stateflow + spec-task-progress (Claude Code side)
+### Step 5: Remove Claude Code Skills
 
-This step removes **two** skills from `~/.claude/skills/`. Both parts must be executed — do not stop after the first.
+This step removes **three** skills from `~/.claude/skills/`.
 
 **Part A — spec-stateflow:**
 
@@ -547,7 +504,7 @@ else
 fi
 ```
 
-**Part B — spec-task-progress (Claude Code side, REQUIRED):**
+**Part B — spec-task-progress (Claude Code side):**
 
 ```bash
 if [ -d "$HOME/.claude/skills/spec-task-progress" ]; then
@@ -558,49 +515,83 @@ else
 fi
 ```
 
-### Step 6: Remove spec content from CLAUDE.md
-
-1. Check if `~/.claude/CLAUDE.md` exists → skip if not found.
-2. **Marker-based removal (primary path)** — search for `<!-- SPEC_STATEFLOW_KIT_BEGIN -->` and `<!-- SPEC_STATEFLOW_KIT_END -->`:
-   - Both markers found, balanced → log the line range being removed, then **auto-remove** (no additional confirmation needed — user already confirmed in Step 1): delete from `<!-- SPEC_STATEFLOW_KIT_BEGIN -->` through `<!-- SPEC_STATEFLOW_KIT_END -->` (inclusive); compress consecutive blank lines to max 1.
-   - Only one marker present (unbalanced) → warn `⚠️ Unbalanced markers in CLAUDE.md — refusing automatic removal. Please inspect ~/.claude/CLAUDE.md manually.` and skip.
-   - Neither marker found → fall through to legacy fallback (step 3).
-3. **Legacy fallback (only when markers are absent)** — search for legacy spec keywords (`spec-stateflow`, `SPEC_DIR`, `Spec Workflow`, `Spec 路径约定`, `Spec 工作流`):
-   - No keywords found → no spec content; skip.
-   - Keywords found → preview and warn: `⚠️ No BEGIN/END markers — this install predates marker support. Auto-removal may affect content beyond the spec section. Continue with legacy 3-strategy removal? (y/n)`. On confirmation, execute **legacy 3-strategy removal** below. On decline, skip and suggest manual review.
-4. Report: `✅ spec content removed from CLAUDE.md` or `⏭️ CLAUDE.md not modified`.
-
-**Legacy 3-strategy removal (only when markers are absent — execute in order, stop at first success):**
-
-| Strategy | Condition | Action |
-|----------|-----------|--------|
-| **A — Section header** (preferred) | Found header `# Claude Code Usage Guidelines` or `# Claude Code 使用规范` | Remove from that header line to end of file |
-| **B — Keyword lines** (fallback) | No header but spec keywords exist | Remove lines containing keywords; compress consecutive blank lines to max 1 |
-| **C — Manual** (last resort) | Neither header nor keywords found | Inform user, skip auto-removal, suggest manual review |
-
-**Post-removal**: If file becomes empty/whitespace-only, keep file with no content.
-
-### Step 7: Remove CLAUDE-reference.md
-
-`CLAUDE-reference.md` is entirely generated by the installer and contains no user content — remove automatically.
+**Part C — spec-router:**
 
 ```bash
-if [ -f "$HOME/.claude/CLAUDE-reference.md" ]; then
-    rm -f "$HOME/.claude/CLAUDE-reference.md"
-    echo "✅ CLAUDE-reference.md removed"
+if [ -d "$HOME/.claude/skills/spec-router" ]; then
+    rm -rf "$HOME/.claude/skills/spec-router"
+    echo "✅ spec-router removed"
 else
-    echo "⏭️  CLAUDE-reference.md not found, skipped"
+    echo "⏭️  spec-router not found, skipped"
 fi
 ```
 
-### Step 8: Cleanup /tmp state files
+### Step 6: Remove spec-env.json (Claude Code side)
+
+```bash
+if [ -f "$HOME/.claude/spec-env.json" ]; then
+    rm -f "$HOME/.claude/spec-env.json"
+    echo "✅ ~/.claude/spec-env.json removed"
+else
+    echo "⏭️  ~/.claude/spec-env.json not found, skipped"
+fi
+```
+
+### Step 7: Remove settings.json Hook + allowedTools Entries
+
+Load `~/.claude/settings.json` and remove spec kit entries:
+
+```python
+# Identify entries to remove:
+# Stop hooks: command contains "spec-stop-anchor.sh"
+# PostToolUse hooks: command contains "spec-state-guard.sh"
+# allowedTools: exact string match against kit tools list
+
+KIT_TOOLS = [
+    "Read", "Write", "Edit", "Glob", "Grep",
+    "Bash(git *)", "Bash(find *)", "Bash(ls *)",
+    "Bash(cat *)", "Bash(python3 *)", "Bash(npm run *)"
+]
+
+# Load settings, prune matching entries
+# After pruning: if hooks['Stop'] becomes [] → keep [] (don't remove key)
+# After pruning: if allowedTools becomes [] → keep [] (don't remove key)
+# Report: "Removed N hook entries, M allowedTools entries"
+```
+
+### Step 8: Remove Hook Scripts
+
+```bash
+for script in spec-stop-anchor.sh spec-state-guard.sh; do
+    if [ -f "$HOME/.claude/scripts/$script" ]; then
+        rm -f "$HOME/.claude/scripts/$script"
+        echo "✅ ~/.claude/scripts/$script removed"
+    else
+        echo "⏭️  ~/.claude/scripts/$script not found, skipped"
+    fi
+done
+# Note: ~/.claude/scripts/ directory itself is not removed (may contain other user scripts)
+```
+
+### Step 9: Remove spec-session.json
+
+```bash
+if [ -f "$HOME/.claude/spec-session.json" ]; then
+    rm -f "$HOME/.claude/spec-session.json"
+    echo "✅ ~/.claude/spec-session.json removed"
+else
+    echo "⏭️  ~/.claude/spec-session.json not found, skipped"
+fi
+```
+
+### Step 10: Cleanup /tmp state files
 
 ```bash
 rm -f /tmp/claude-monitor-*.json /tmp/claude-monitor-*.pid /tmp/claude-monitor-*.lock /tmp/claude-monitor-*-daemon.log /tmp/claude-spec-*.log
 echo "✅ /tmp state files cleaned up"
 ```
 
-If any file cannot be removed (e.g. permission denied), warn and continue:
+If any file cannot be removed, warn and continue:
 > ⚠️ Could not remove some /tmp state files. They are harmless and will be cleaned up on next reboot.
 
 ### Uninstall Completion Report
@@ -609,19 +600,25 @@ If any file cannot be removed (e.g. permission denied), warn and continue:
 ✅ Spec kit uninstall complete!
 
   Removed:
-    ✅ spec-env.json
-    ✅ spec-task-progress             (claw-side)
+    ✅ spec-env.json                  (claw side)
+    ✅ spec-task-progress             (claw side)
     ✅ claude-code-spec-driver
     ✅ claude-code-spec-monitor
     ✅ spec-stateflow-kit-installer
     ✅ spec-stateflow                 (Claude Code side)
     ✅ spec-task-progress             (Claude Code side)
-    ✅ claude.md spec content
-    ✅ CLAUDE-reference.md
+    ✅ spec-router                    (Claude Code side)
+    ✅ ~/.claude/spec-env.json
+    ✅ settings.json hook entries
+    ✅ settings.json allowedTools entries
+    ✅ spec-stop-anchor.sh
+    ✅ spec-state-guard.sh
+    ✅ spec-session.json
     ✅ /tmp state files
 
   ✅ Preserved:
     📁 Spec documents at {WORKSPACE}/{DOC_DIR} — untouched
+    📄 ~/.claude/CLAUDE.md — untouched
 
   ℹ️ To re-install: tell the agent "install spec kit at {original_kit_path}"
      The agent reads SKILL.md directly from the kit directory — no copying required.
@@ -640,29 +637,26 @@ If any file cannot be removed (e.g. permission denied), warn and continue:
 | spec-env.json is corrupted (invalid JSON) | Install | Warn user, offer to overwrite with fresh config |
 | Path alignment check fails | Install | Abort at Step 4 with clear diagnosis |
 | Smoke test fails (spec-env.json not loadable) | Install | Abort at Step 4, diagnose path arithmetic |
-| claude.md already has spec content | Install | Ask whether to overwrite/append |
-| claude.md is read-only / permission denied | Install/Uninstall | Warn user, skip this step |
-| claude-reference.md already exists | Install | Ask whether to overwrite |
+| ~/.claude/scripts/ not writable | Install | Warn user, skip Step 6 |
+| settings.json is corrupted | Install | Warn user, offer to reset to `{}` before merging |
 | WORKSPACE directory doesn't exist | Install | Require user to re-enter valid path |
 | No spec components found | Uninstall | Inform "Nothing to uninstall", abort |
 | Monitor process cannot be killed (Step 2) | Uninstall | Warn user with PID; continue removing files; advise `kill -9 {PID}` or reboot |
-| /tmp state file removal fails (Step 8) | Uninstall | Warn "could not remove some /tmp files"; continue; advise reboot for cleanup |
-| Language detection on empty CLAUDE.md | Install | Check request language first: CJK if user wrote in Chinese, otherwise default to English |
-| CJK content written as garbled /方块乱码 | Install | Re-write using safe method from Step 5/6 (heredoc `cat` or Python `codecs.open(..., 'utf-8')`). Verify with `cat ~/.claude/CLAUDE.md` before proceeding to Step 7. |
+| /tmp state file removal fails (Step 10) | Uninstall | Warn "could not remove some /tmp files"; continue; advise reboot for cleanup |
 
 ## Bundled Resources
 
 | Resource | Purpose |
 |----------|---------|
-| `claude-sample.md` | English base template for CLAUDE.md injection — decision & workflow rules (translated to CJK if auto-detected). **Placeholders (`{SPEC_DIR}`, `{SPEC_NAME}`, `{SPEC_PATH}`, `{CLAUDE_CLI}`, `{WORKSPACE}`, `{DOC_DIR}`) are kept verbatim in the body** so the body teaches their meaning; actual values are supplied by the path-resolution prefix block built by the installer (Install Step 5 step 6). |
-| `claude-reference-sample.md` | English base template for CLAUDE-reference.md — dependency analysis, code standards, quality standards (translated to CJK, same language as CLAUDE.md). **Same placeholder rule as above.** |
+| `scripts/spec-stop-anchor.sh` | Stop Hook script — deployed to `~/.claude/scripts/` in Step 6 |
+| `scripts/spec-state-guard.sh` | PostToolUse Hook script — deployed to `~/.claude/scripts/` in Step 6 |
 | `spec-env.json.example` | Reference example showing the spec-env.json format — not read by the installer |
 
 ## Testing
 
 When user inputs `test installer`, `测试 installer`, or `test spec-installer`:
 
-> **Scope**: Tests the installer's decision logic using fixture data. Does **not** write any files, copy any skills, or touch CLAUDE.md — purely logic verification. Safe to run at any time.
+> **Scope**: Tests the installer's decision logic using fixture data. Does **not** write any files, copy any skills, or touch any config — purely logic verification. Safe to run at any time.
 
 1. Locate `test-cases/` directory relative to this SKILL.md
 2. For each subdirectory (tc01, tc02, …) in order:
@@ -678,21 +672,6 @@ When user inputs `test installer`, `测试 installer`, or `test spec-installer`:
 | Language detection | tc01–tc04 | CLAUDE.md content + request phrase → `cjk` or `english` |
 | Marker detection | tc05–tc07 | CLAUDE.md content → marker status and required action |
 | Legacy keyword detection | tc08 | CLAUDE.md without markers → legacy keyword scan result |
-
-**Language detection logic (applied to tc01–tc04):**
-```python
-import re
-non_ws = re.sub(r'\s', '', claude_md_content)
-cjk_count = len(re.findall(r'[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]', non_ws))
-ratio = cjk_count / len(non_ws) if non_ws else 0
-is_cjk = ratio > 0.3
-# If non_ws is empty: check request_phrase for CJK characters instead
-```
-
-**Marker detection logic (applied to tc05–tc08):**
-- Both `<!-- SPEC_STATEFLOW_KIT_BEGIN -->` and `<!-- SPEC_STATEFLOW_KIT_END -->` present → `balanced`
-- Only one present → `unbalanced`
-- Neither present → `none` → then scan for legacy keywords: `spec-stateflow`, `SPEC_DIR`, `Spec Workflow`, `Spec 路径约定`, `Spec 工作流`
 
 **Example test run output:**
 ```
@@ -710,13 +689,6 @@ tc08-legacy-keywords-no-markers          PASS
 8/8 cases passed ✓
 ```
 
-On FAIL, show the field diff:
-```
-tc01-lang-detect-cjk-above-threshold   FAIL
-  expected: language=cjk
-  got:      language=english
-```
-
 ---
 
 ## Notes
@@ -724,5 +696,5 @@ tc01-lang-detect-cjk-above-threshold   FAIL
 - **Installer removed on uninstall**: The installer skill (`{SKILLS_DIR}/spec-stateflow-kit-installer/`) is removed during uninstall. To re-install, tell the agent the kit directory path (e.g. "install spec kit at ~/Desktop/spec-stateflow-kit"). The agent reads `spec-stateflow-kit-installer/SKILL.md` directly from the kit source directory — no manual copying required.
 - **How install is triggered**: The agent reads `{KIT_DIR}/spec-stateflow-kit-installer/SKILL.md` directly from the kit directory provided by the user. The skill self-copies to `{SKILLS_DIR}` during Step 3. No pre-installation of the skill into SKILLS_DIR is needed.
 - **Post-install**: The source package `{KIT_DIR}` can be kept or moved; runtime only uses `{SKILLS_DIR}`
-- **Runtime config**: Paths in `spec-env.json` can be manually edited; all skills read dynamically at runtime
-- **spec-env.json location**: Always at `{SKILLS_DIR}/../spec-env.json`. Python daemon scripts (`monitor_daemon.py` etc.) derive this path from `__file__` at runtime (3 levels up). The Claude Code–side `spec-task-progress` is an LLM skill with no Python scripts — it reads `SPEC_DIR` from the `Spec 路径解析` table in `~/.claude/CLAUDE.md`, not from `spec-env.json`.
+- **Runtime config**: Paths in both `spec-env.json` copies can be manually edited; all skills read dynamically at runtime. Sync both copies if edited manually.
+- **spec-env.json copies**: Claw side at `{SKILLS_DIR}/../spec-env.json`; Claude Code side at `~/.claude/spec-env.json`. Both contain the same content and are kept in sync by the installer.
