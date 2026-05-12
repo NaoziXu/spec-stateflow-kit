@@ -60,7 +60,8 @@ User Input
 | Command | Action |
 |---------|--------|
 | `continue` / `resume` | Step 0 (fast-path recovery) → invoke spec-stateflow Compression Recovery |
-| `check progress` / `task status` | Read `tasks.md` → display current progress |
+| `updatecode` | Read `{SPEC_PATH}/tasks.md` (resolve via spec-session.json); resume coding from first `[ ]` or `[~]` task |
+| `check progress` / `task status` | Read `{SPEC_PATH}/tasks.md` (resolve via spec-session.json or ask user); display task list with statuses |
 
 ## Step 0: Session Context Recovery
 
