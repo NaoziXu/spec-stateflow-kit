@@ -336,16 +336,27 @@ Load or create `~/.claude/settings.json` (create as `{}` if not exists). Then me
 
 **Hook entries to add:**
 
+> ⚠️ **CRITICAL — Claude Code hooks format requirement**: Each hook entry **must** use a `hooks` array containing objects with `"type": "command"` and `"command": "..."`. Do **not** use a bare `"command"` key at the top level of the hook entry — this will cause a validation error (`Expected array, but received undefined`).
+>
+> ❌ Wrong: `{"matcher": "Write|Edit", "command": "..."}`
+> ✅ Correct: `{"matcher": "Write|Edit", "hooks": [{"type": "command", "command": "..."}]}`
+
 ```json
 {
   "hooks": {
     "Stop": [
-      {"command": "~/.claude/scripts/spec-stop-anchor.sh"}
+      {
+        "hooks": [
+          {"type": "command", "command": "~/.claude/scripts/spec-stop-anchor.sh"}
+        ]
+      }
     ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
-        "command": "~/.claude/scripts/spec-state-guard.sh"
+        "hooks": [
+          {"type": "command", "command": "~/.claude/scripts/spec-state-guard.sh"}
+        ]
       }
     ]
   }
@@ -563,8 +574,10 @@ Load `~/.claude/settings.json` and remove spec kit entries:
 
 ```python
 # Identify entries to remove:
-# Stop hooks: command contains "spec-stop-anchor.sh"
-# PostToolUse hooks: command contains "spec-state-guard.sh"
+# Stop hooks: any entry whose nested hooks[].command contains "spec-stop-anchor.sh"
+# PostToolUse hooks: any entry whose nested hooks[].command contains "spec-state-guard.sh"
+# Note: Claude Code hooks format nests commands inside a "hooks" array:
+#   {"hooks": [{"type": "command", "command": "..."}]}
 # allowedTools: exact string match against kit tools list
 
 KIT_TOOLS = [
