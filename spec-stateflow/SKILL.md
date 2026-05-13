@@ -150,6 +150,64 @@ Requirement description
 
 Use the DOC_LANG detected in Phase 1 for all natural-language content in this document. If the user issues a language override at any point, update DOC_LANG immediately.
 
+At the start of Phase 2, launch parallel codebase exploration and skeleton drafting simultaneously:
+
+**Parallel step A — Launch Explore subagent** with the following prompt:
+```
+You are exploring an existing codebase to support a technical design task.
+
+## Requirements context
+{summary of requirement names and key scope from requirements.md, ≤200 words}
+
+## Search tasks
+1. Find files and classes matching these names/patterns: {module names, class names, interface names extracted from requirements}
+2. For each found class/interface: list key method signatures
+3. Find existing test files for the affected modules
+4. Identify any patterns (naming conventions, error handling, data formats) that the new design should follow
+
+## Output format
+### Files found
+- {path}: {brief description}
+
+### Key classes / interfaces
+- {ClassName} ({path}): {key methods}
+
+### Existing patterns
+- {pattern name}: {description}
+
+### Potential conflicts
+- {description of existing code that may need changes}
+
+Be factual and concise. Do not make design recommendations.
+```
+
+**Parallel step B — Draft design skeleton** (do not wait for subagent): draft section headings and key bullet points for Background, Design Goals, Business Model, and System Design.
+
+**After Explore subagent completes:**
+- Success → merge findings into the design draft; if any finding contradicts the draft, revise the affected section to reflect the actual code state
+- Failure / timeout → continue Phase 2 with main agent exploration only; append the following note at the end of design.md: "代码库探索 subagent 不可用，已降级为串行探索 / Explore subagent unavailable, fell back to serial exploration" (this note is a passive record, not an error alert)
+
+After completing the design document body, append a `<details>` exploration log at the end of design.md:
+
+```markdown
+<details>
+<summary>Codebase exploration log (auto-generated, collapsible)</summary>
+
+**Exploration time**: {timestamp}
+**Search scope**: {file patterns and class names searched}
+
+**Key files found**:
+- {path}: {brief description}
+
+**Key patterns found**:
+- {pattern name}: {description}
+
+**Potential conflicts**:
+- {description}
+
+</details>
+```
+
 After completing the requirements design, based on the current technical architecture and the confirmed requirements above, design the technical solution. It should be concise but accurately describe the technical architecture (e.g., architecture, tech stack, technology selection, database/interface design, test strategy, security). Use mermaid diagrams when necessary.
 
 **Must include chapters:** Background, Design Goals, Business Model, System Design (precise to package path, class name, method signature), Refactoring Design (if applicable), Deployment Plan (for large tasks), Risk Assessment (for large tasks).
