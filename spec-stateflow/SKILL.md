@@ -461,7 +461,9 @@ Branch confirmation (MUST complete before any file changes or git operations):
    c. Write working_branch to progress.json only when the value changes:
       Case A: always write; Case B mismatch: write after user decision; Case B match: skip.
 
-0. Validate tasks.md format — ensure every task has a valid status marker [ ]/[~]/[✓]/[⏭]. Fix any missing/invalid markers before proceeding.
+0. Validate tasks.md format:
+   a. Ensure every task has a valid status marker [ ]/[~]/[✓]/[⏭]. Fix any missing/invalid markers before proceeding.
+   b. Verify dual-layer consistency: for each task, check that the Overview list marker matches the `### Task N:` table Status field. If inconsistent, the table Status is authoritative — update the Overview marker to match, then continue.
 1. Read {SPEC_PATH}/tasks.md → if any [~] task exists, continue it; otherwise find first [ ] task
 2. Mark it [~] → execute per Specifics description
 3. After implementation, run the compile command in the Verification field:
@@ -475,7 +477,13 @@ Branch confirmation (MUST complete before any file changes or git operations):
    - Tests fail → same rules as compile failure (record Notes → fix → retry; after 3 failures escalate to user)
 4. Mark task [✓], record Verification result (actual commands run and output summary), stage changes (git add)
 5. Show diff → wait for user review and explicit commit approval (**skipped in [Continuous Operation Mode](#continuous-operation-mode)**)
-6. If user approves: commit → backfill Commit field with actual message + short hash → next task. If user rejects: revert status to [~], address feedback, repeat from step 2
+6. If user approves: commit → backfill Commit field with actual message + short hash → verify the completed task entry in tasks.md:
+   - Overview marker matches table Status field
+   - Commit field is filled (not —)
+   - Verification field is filled (not —)
+   - User corrections field is filled (not —)
+   Fix any missing or inconsistent fields immediately, then proceed to next task.
+   If user rejects: revert status to [~], address feedback, repeat from step 2
 7. User says "next" → repeat from step 1
 
 **严格禁止 / Strictly prohibited**: Executing git commit while compilation or tests are failing, under any circumstances — including the practice of "commit now, fix in a later task".
@@ -620,6 +628,7 @@ Reverts to Default Mode immediately on:
 **Step 1: Read Spec files, confirm `{SPEC_PATH}/tasks.md` progress**
 - Read `{SPEC_PATH}/requirements.md`, `{SPEC_PATH}/design.md`, `{SPEC_PATH}/tasks.md`
 - `tasks.md` is the **only trustworthy state source** — summary progress descriptions are NOT reliable
+- **Dual-layer consistency check**: for every task, verify the Overview list marker matches the `### Task N:` table Status field. If inconsistent, the table Status is authoritative — correct the Overview marker before proceeding. Do not infer task completion from the Overview alone.
 - **Special cases:**
   - **If Spec files don't exist:**
     - Spec planning hasn't started. Ask user to confirm task scope, then begin Phase 1.
