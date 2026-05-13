@@ -272,7 +272,62 @@ Environments, rollout steps, rollback plan
 
 Use the DOC_LANG detected in Phase 1 for all natural-language content in this document (Task Name, Specifics, Notes, etc.). Technical terms, code snippets, and command strings remain in their original form.
 
-After completing the technical solution design, based on the requirements document and technical solution, break down specific tasks. You must confirm with the user clearly, then save to `{SPEC_PATH}/tasks.md`. After confirming with the user, proceed to the next phase.
+After completing the technical solution design, based on the requirements document and technical solution, break down specific tasks, following the Compilation Independence Principle above.
+
+Save to `{SPEC_PATH}/tasks.md`.
+
+Before presenting to the user, run a Critic subagent to review quality and compilation safety:
+
+```
+Critic subagent prompt:
+You are reviewing a task breakdown for quality and compilation safety. Report findings only — do not rewrite the document.
+
+## Design document sections
+{list of level-1 and level-2 headings from design.md, without body text}
+
+## Tasks
+{tasks.md full text}
+
+## Check dimensions
+
+### Quality
+1. Specifics precision: must reach method/field level (e.g., "add methodA(String s): ReturnType" not "update service layer")
+2. Scope accuracy: each listed file must exist in the codebase or be explicitly marked as new
+3. Dependency ordering: no task N has a Note saying it depends on task M where M > N
+4. Design coverage: every section in the design doc has at least one corresponding task
+
+### Compilation independence
+5. Each task's combined Scope + Affected changes must form an independently compilable unit
+6. Flag any cross-task compilation dependency (e.g., interface change in Task N, implementation in Task M where M ≠ N)
+
+## Output format
+### Quality issues
+- [Task {n}] {field}: {description}
+
+### Compilation issues
+- [Task {n} ↔ Task {m}] {description of dependency}
+
+### Summary
+Tasks reviewed: {total} | Quality issues: {count} | Compilation issues: {count}
+```
+
+After receiving Critic findings:
+- **Quality issues**: refine Specifics to method/field level; add any missing tasks and renumber; reorder or add Notes for dependency ordering issues
+- **Compilation independence issues**: merge the affected tasks; list merged task numbers in the Critic summary
+- **No issues found**: skip revision, proceed directly to user confirmation
+- **Critic subagent fails**: continue with the unreviewed draft; note "自动审查已跳过 / Auto-review skipped" in the summary
+
+When presenting tasks.md to the user, append the following Critic summary:
+
+```
+---
+**任务拆分自动审查摘要 / Task Breakdown Auto-Review Summary**
+- 审查任务数 / Tasks reviewed: {n}
+- 质量问题 / Quality issues: {n} 条，已全部修订 / all fixed
+- 编译独立性问题 / Compilation issues: {n} 条，已全部修订（涉及任务合并 / tasks merged: {list}）
+```
+
+After confirming with the user, proceed to the next phase.
 
 **If user rejects or requests changes:** Adjust task breakdown and re-confirm. Do NOT proceed to Phase 4 until user explicitly approves.
 
