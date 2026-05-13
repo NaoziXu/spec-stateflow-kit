@@ -276,6 +276,14 @@ After completing the technical solution design, based on the requirements docume
 
 **If user rejects or requests changes:** Adjust task breakdown and re-confirm. Do NOT proceed to Phase 4 until user explicitly approves.
 
+### 编译独立性原则（Compilation Independence Principle）
+
+拆分任务时，**编译独立性是任务边界的第一约束**，优先于逻辑独立性：
+
+- 每个任务的 Scope + Affected 所涵盖的变更，必须构成一个可独立编译的完整单元
+- 当多个变更存在编译依赖关系（如：新增接口方法、同步实现类、更新全部调用方），必须合并为**同一个任务**，在 Specifics 字段中逐一列出所有涉及的类、方法和调用点
+- 禁止将"接口变更"与"实现/调用方变更"拆入不同任务
+
 ### Task Field Specification
 
 Every task in `{SPEC_PATH}/tasks.md` must contain the following fields:
@@ -287,7 +295,7 @@ Every task in `{SPEC_PATH}/tasks.md` must contain the following fields:
 | **Affected** | Files that need sync changes due to this task (imports, calls, etc.) | `NoticeService.java`, `BpmService.java` |
 | **Specifics** | **Most critical field.** Precise down to method/field level | `Interface remove methodA(), methodB(); add methodC(String)` |
 | **Status** | `[✓]` Done / `[ ]` Not started / `[~]` In progress or paused / `[⏭]` Skipped (user decision only; dependencies not auto-blocked, flag in final summary) | `[✓]` |
-| **Verification** | How to verify (compile, test, grep, etc.) | `grep signatures + compile verification` |
+| **Verification** | **必填。** 须包含：① 项目编译命令；② 如项目有自动化测试，须包含与本任务 Scope 相关的测试命令。示例：`./gradlew compileJava && ./gradlew test --tests 'com.example.ServiceTest'` | `./gradlew compileJava && ./gradlew test --tests 'com.example.ServiceTest'` |
 | **Commit** | Backfill **after** git commit: actual commit message + short hash | `feat(proxy): remove unused methods (a1b2c3d)` |
 | **User corrections** | Count of user corrections; ≥2 triggers escalation | `0` |
 | **Notes** | Dependencies, blockers, scope changes | `Depends on task 1` |
@@ -350,7 +358,7 @@ Tasks use a **dual-layer format**: an Overview list for machine parsing + `### T
 | **Scope** | `IMultiAppInfoProxyInterface.java`, `MultiAppInfoProxy.java` |
 | **Affected** | — |
 | **Specifics** | Interface add getAppName(String); impl class add getAppName(String) |
-| **Verification** | — |
+| **Verification** | `./gradlew compileJava` |
 | **Commit** | — |
 | **User corrections** | — |
 | **Notes** | Depends on task 1 completion |
