@@ -56,6 +56,13 @@ All Spec files use the following placeholders. Actual paths are resolved from `~
 
 ## Phase 1: Requirements Document and Acceptance Criteria Design
 
+Before drafting requirements.md, detect the primary language of the user's initial prompt:
+- Base detection on natural language words only; ignore code blocks, commands, and technical terms
+- If the user has already specified a document language (e.g., "write in English", "用中文写"), use that and skip detection
+- Record the detected language as DOC_LANG for use in Phase 1, 2, and 3
+
+Write all natural-language content of requirements.md in DOC_LANG. Technical terms, code snippets, and command examples remain in their original form. If the user issues a language override at any point, update DOC_LANG immediately and apply to all remaining documents.
+
 First complete the requirements design using EARS (Easy Approach to Requirements Syntax) method. You must confirm requirement details with the user. After final confirmation, the requirements are finalized, then proceed to the next phase.
 
 Save to `{SPEC_PATH}/requirements.md`. After confirming with the user, proceed to the next phase.
@@ -87,6 +94,8 @@ Requirement description
 ---
 
 ## Phase 2: Technical Solution Design
+
+Use the DOC_LANG detected in Phase 1 for all natural-language content in this document. If the user issues a language override at any point, update DOC_LANG immediately.
 
 After completing the requirements design, based on the current technical architecture and the confirmed requirements above, design the technical solution. It should be concise but accurately describe the technical architecture (e.g., architecture, tech stack, technology selection, database/interface design, test strategy, security). Use mermaid diagrams when necessary.
 
@@ -149,6 +158,8 @@ Environments, rollout steps, rollback plan
 ---
 
 ## Phase 3: Task Breakdown
+
+Use the DOC_LANG detected in Phase 1 for all natural-language content in this document (Task Name, Specifics, Notes, etc.). Technical terms, code snippets, and command strings remain in their original form.
 
 After completing the technical solution design, based on the requirements document and technical solution, break down specific tasks. You must confirm with the user clearly, then save to `{SPEC_PATH}/tasks.md`. After confirming with the user, proceed to the next phase.
 
