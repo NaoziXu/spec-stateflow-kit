@@ -352,6 +352,10 @@ def cmd_restart(task_id):
 
     time.sleep(2)
     print('Verifying daemon started...')
+    alive, pid = daemon_alive(p)
+    if not alive:
+        print('ERROR: daemon failed to start. Check log:', p['daemon_log'], file=sys.stderr)
+        sys.exit(1)
     cmd_status(task_id)
 
 

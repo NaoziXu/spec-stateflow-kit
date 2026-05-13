@@ -1,47 +1,47 @@
 [
   {
     "id": 1,
-    "prompt": "User says: 'Install spec kit'. Claude Code is installed (path /Users/didi/.local/bin/claude), spec-env.json doesn't exist, no old skills.",
-    "expected": "Agent should execute Install mode (7 steps): 1) Detect Claude Code ✅ 2) Interactively ask WORKSPACE, confirm DOC_DIR=doc, detect CLAUDE_CLI 3) Copy 3 skills (spec-task-progress, claude-code-spec-driver, claude-code-spec-monitor) from {KIT_DIR} to {SKILLS_DIR}/ 4) Run path validation checks 5) Read claude-sample.md, detect CLAUDE.md language via CJK ratio, translate if needed, build path-resolution prefix with actual values, inject — NOTE: placeholders ({SPEC_DIR}, {SPEC_PATH}, etc.) remain verbatim in body; actual values appear only in the prefix table 6) Read claude-reference-sample.md, translate with same language, write to ~/.claude/CLAUDE-reference.md 7) Copy spec-stateflow to ~/.claude/skills/"
+    "prompt": "User says: 'Install spec kit'. Claude Code is installed (path /Users/didi/.local/bin/claude), spec-env.json doesn't exist, WORKSPACE=/Users/didi/Projects, DOC_DIR=doc.",
+    "expected": "Agent should execute Install mode (Steps 0-7): 0) Locate kit directory 1) Detect Claude Code ✅ 2) Interactively ask WORKSPACE, confirm DOC_DIR=doc, detect CLAUDE_CLI, write spec-env.json to both ~/.workbuddy/ and ~/.claude/ 3) Install claw-side skills (spec-task-progress, claude-code-spec-driver, claude-code-spec-monitor) 4) Validate paths 5) Install Claude Code skills (spec-stateflow, spec-task-progress, spec-router) 6) Install hook scripts (spec-stop-anchor.sh, spec-state-guard.sh) 7) Configure settings.json (hooks + allowedTools). Output: '✅ Spec kit installation complete!'"
   },
   {
     "id": 2,
     "prompt": "User says: 'Install spec kit'. Claude Code is not installed (which claude returns nothing).",
-    "expected": "Agent should abort at Install Step 1, inform 'Claude Code is not installed or unavailable. Please install first.', do not proceed"
+    "expected": "Agent should abort at Install Step 1, inform 'Claude Code is not installed or unavailable. Please install first.', do not proceed with remaining steps."
   },
   {
     "id": 3,
-    "prompt": "User says: 'Uninstall spec'. All spec components exist (spec-env.json, 3 skills, spec-stateflow, claude.md spec content).",
-    "expected": "Agent should execute Uninstall mode: 1) List found components (including claude-reference.md), confirm with user ⛔ 2) Remove spec-env.json 3) Remove 3 skills 4) Remove spec-stateflow 5) Detect spec content in CLAUDE.md via BEGIN/END markers, preview, confirm, remove marker block (primary path); fall through to legacy 3-strategy removal (A→B→C) only if markers absent 6) Remove claude-reference.md 7) Cleanup monitor state files. Show completion report."
+    "prompt": "User says: 'Uninstall spec'. All spec components exist: spec-env.json (both sides), 3 claw skills, 3 Claude Code skills, hook scripts, settings.json entries.",
+    "expected": "Agent should execute Uninstall mode (Steps 1-10): list all found components, confirm with user ⛔, then remove spec-env.json (claw + Claude Code side), remove 3 claw skills, remove 3 Claude Code skills, remove settings.json hooks + allowedTools entries, remove hook scripts, remove spec-session.json, cleanup control files. Report '✅ Spec kit uninstalled.'"
   },
   {
     "id": 4,
-    "prompt": "User says: 'Uninstall spec'. No spec components found (nothing installed).",
-    "expected": "Agent should inform 'Nothing to uninstall', abort without removing anything"
+    "prompt": "User says: 'Uninstall spec'. No spec components found (spec-env.json missing, no skills installed).",
+    "expected": "Agent should inform 'Nothing to uninstall — no spec components found.', abort without removing anything."
   },
   {
     "id": 5,
     "prompt": "User says: 'Uninstall spec'. Components found, but user declines the confirmation prompt.",
-    "expected": "Agent should abort uninstall, do not remove anything"
+    "expected": "Agent should abort uninstall, do not remove anything, confirm 'Uninstall cancelled.'"
   },
   {
     "id": 6,
-    "prompt": "User says: 'Install spec kit'. ~/.claude/CLAUDE.md already contains spec-stateflow keyword. The existing CLAUDE.md has >30% CJK characters.",
-    "expected": "Agent should at Install Step 5: 1) Detect existing spec content via BEGIN/END markers, ask overwrite 2) Calculate CJK ratio using python logic → is_cjk=True → translate claude-sample.md to Chinese 3) Build path-resolution prefix with actual values from spec-env.json (e.g. WORKSPACE=/Users/didi/MasProjects); inject prefix + translated body — placeholders ({SPEC_DIR}, {CLAUDE_CLI}, etc.) remain verbatim in body, actual values appear only in the prefix table"
+    "prompt": "User says: 'Install spec kit'. ~/.claude/settings.json already contains one of the kit's allowedTools entries (e.g. 'Bash(git *)') and one of the hook commands.",
+    "expected": "Agent should at Step 7: detect duplicate allowedTools entry via strip+case-sensitive match → silently skip that entry; detect existing hook with same command string → prompt user 'hook already exists, overwrite? (y/n)', keep existing if user says n. Report actual counts: '✅ settings.json: N hook entries added, M allowedTools entries added' (skipped entries not counted)."
   },
   {
     "id": 7,
     "prompt": "User says: 'spec-stateflow-kit-installer' (no mode specified).",
-    "expected": "Agent should ask user: 'Install or uninstall?' to determine the correct mode before proceeding"
+    "expected": "Agent should ask user: 'Install or uninstall?' to determine the correct mode before proceeding."
   },
   {
     "id": 8,
-    "prompt": "User says: '安装spec'. The existing CLAUDE.md is empty (new file).",
-    "expected": "Agent should route to Install mode (Chinese trigger matched). At Install Step 5: empty CLAUDE.md → CJK ratio = 0 → check request language ('安装spec' is Chinese) → is_cjk = True → translate claude-sample.md to Chinese → build path-resolution prefix with actual values, inject translated content; placeholders remain verbatim in body"
+    "prompt": "User says: 'Install spec kit'. spec-env.json exists but contains invalid JSON.",
+    "expected": "Agent should at Step 2: warn user 'spec-env.json is corrupted (invalid JSON)', offer to overwrite with fresh config. If user confirms → overwrite and continue. If user declines → abort."
   },
   {
     "id": 9,
-    "prompt": "User says: 'Install spec kit'. {SKILLS_DIR}/../spec-env.json exists but contains invalid JSON.",
-    "expected": "Agent should at Step 2: warn user 'spec-env.json is corrupted (invalid JSON)', offer to overwrite with fresh config. If user declines → abort."
+    "prompt": "User says: 'Install spec kit'. spec-env.json already exists with valid config (WORKSPACE and DOC_DIR set).",
+    "expected": "Agent should at Step 2: detect existing spec-env.json, display current values, ask user to confirm or update. If user confirms → keep existing values and continue. If user provides new values → overwrite spec-env.json and continue."
   }
 ]

@@ -176,8 +176,8 @@ def save_state(
     try:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[warn] failed to write state to {path}: {e}", file=sys.stderr)
 
 
 def init_state_if_missing(spec_path: Optional[str], task_id: str = '') -> None:
@@ -192,8 +192,8 @@ def init_state_if_missing(spec_path: Optional[str], task_id: str = '') -> None:
         try:
             with open(path, 'w', encoding='utf-8') as f:
                 json.dump(state, f, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[warn] failed to init state at {path}: {e}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -340,8 +340,8 @@ def trigger_stop(task_id: str, spec_path: Optional[str]) -> None:
     try:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(state, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[warn] failed to write stop state to {path}: {e}", file=sys.stderr)
     print("ACTION: STOP")
 
 

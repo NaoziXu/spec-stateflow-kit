@@ -12,7 +12,7 @@
   {
     "id": 3,
     "prompt": "User says: 'How far is the service foundation task?'. doc directory has 586742-remove-service-foundation-dependency.",
-    "expected": "Agent should scan SPEC_DIR for directory names containing 'service' or 'foundation', fuzzy match to 586742-remove-service-foundation-dependency, then read tasks.md and output progress summary"
+    "expected": "Agent should scan SPEC_DIR for directory names containing 'service' or 'foundation', deterministic substring match to 586742-remove-service-foundation-dependency (prefix match takes priority over substring; shortest name wins on tie), then read tasks.md and output progress summary"
   },
   {
     "id": 4,

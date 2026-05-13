@@ -373,7 +373,7 @@ Also merge any patterns from `spec-env.json` `allowed_bash_patterns` array.
 
 **Merge rules:**
 - Existing hook with same `command` string → prompt user "⚠️ hook already exists, overwrite? (y/n)", default: keep existing
-- Duplicate `allowedTools` entry (exact string match) → silently skip
+- Duplicate `allowedTools` entry → silently skip (comparison: strip whitespace first, then exact case-sensitive match)
 - Report: `✅ settings.json: N hook entries added, M allowedTools entries added`
 
 ### Install Completion Report

@@ -104,6 +104,8 @@ fi
 
 # Launch Claude Code
 cd "$EFFECTIVE_DIR"
+# TASK_ID mode: append to a fixed log file shared across retries.
+# No-TASK_ID mode: overwrite a timestamp-named log file (new file per run by design).
 if [ -n "$TASK_ID" ]; then
     nohup "$CLAUDE_CLI" -p "$PROMPT" \
         $EXTRA_ARGS \
