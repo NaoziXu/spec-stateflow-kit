@@ -195,7 +195,7 @@ Each task within `tasks.md` follows a strict lifecycle:
 **What it does:** Generates prompts based on task progress and launches Claude Code in non-interactive background mode:
 1. Query progress → 2. Locate spec docs + confirm project → 3. Generate prompt (user confirms ⛔) → 4. Launch Claude Code → 5. Report PID + log path
 
-**Key design:** `project_name` field in `progress.json` for project directory persistence, workspace protection (uncommitted changes → append warning to prompt), worktree isolation support (configurable via `spec-env.json`).
+**Key design:** `project_name` field in `progress.json` for project directory persistence, workspace protection (uncommitted changes → append warning to prompt).
 
 ### claude-code-spec-monitor
 **Role:** Autonomous monitoring guard

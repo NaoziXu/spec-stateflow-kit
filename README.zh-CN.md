@@ -195,7 +195,7 @@ spec-stateflow-kit/
 **功能：** 基于任务进度生成提示词，并在非交互后台模式下启动 Claude Code：
 1. 查询进度 → 2. 定位 spec 文档 + 确认项目 → 3. 生成提示词（用户确认 ⛔）→ 4. 启动 Claude Code → 5. 报告 PID + 日志路径
 
-**关键设计：** `progress.json` 中的 `project_name` 字段实现项目目录持久化，工作区保护（有未提交变更 → 在提示词中附加警告），支持 worktree 隔离执行（通过 `spec-env.json` 配置）。
+**关键设计：** `progress.json` 中的 `project_name` 字段实现项目目录持久化，工作区保护（有未提交变更 → 在提示词中附加警告）。
 
 ### claude-code-spec-monitor
 **角色：** 自主监控守护

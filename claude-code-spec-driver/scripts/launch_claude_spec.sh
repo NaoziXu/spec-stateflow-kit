@@ -36,15 +36,6 @@ WORKSPACE=$(read_json_field "$ENV_FILE" "WORKSPACE")
 DOC_DIR=$(read_json_field "$ENV_FILE" "DOC_DIR")
 CLAUDE_CLI=$(read_json_field "$ENV_FILE" "CLAUDE_CLI")
 
-# Read optional worktree flag (default false)
-WORKTREE_ENABLED=$(python3 -c "
-import json, sys
-try:
-    d = json.load(open('$ENV_FILE'))
-    print('true' if d.get('worktree', False) else 'false')
-except: print('false')
-")
-
 # Argument parsing
 TASK_ID=""
 PROJECT_DIR=""
@@ -80,38 +71,7 @@ if ! command -v "$CLAUDE_CLI" &>/dev/null; then
     exit 1
 fi
 
-# --- Worktree setup (optional, controlled by spec-env.json worktree field) ---
 EFFECTIVE_DIR="$PROJECT_DIR"
-
-if [ "$WORKTREE_ENABLED" = "true" ] && [ -n "$TASK_ID" ]; then
-    WORKTREE_PATH="${PROJECT_DIR}/.worktrees/spec-${TASK_ID}"
-    echo "Worktree mode enabled"
-
-    if [ -d "$WORKTREE_PATH" ]; then
-        wt_status=$(cd "$WORKTREE_PATH" && git status --short 2>/dev/null || echo "ERROR")
-        if [ "$wt_status" = "ERROR" ]; then
-            echo "Error: cannot check git status of existing worktree: $WORKTREE_PATH" >&2
-            exit 1
-        fi
-        if [ -n "$wt_status" ]; then
-            echo "Error: existing worktree has uncommitted changes:" >&2
-            echo "$wt_status" >&2
-            echo "Resolve uncommitted changes manually, then retry." >&2
-            exit 1
-        fi
-        echo "Reusing existing worktree: $WORKTREE_PATH"
-    else
-        git -C "$PROJECT_DIR" worktree add "$WORKTREE_PATH" -b "spec/${TASK_ID}" 2>&1 || {
-            echo "Error: cannot create worktree at $WORKTREE_PATH" >&2
-            echo "Common causes: branch 'spec/${TASK_ID}' already exists, or path conflict." >&2
-            exit 1
-        }
-        echo "Created worktree: $WORKTREE_PATH"
-    fi
-    echo "Worktree: $WORKTREE_PATH"
-    EFFECTIVE_DIR="$WORKTREE_PATH"
-fi
-# --- End worktree setup ---
 
 # Log file: if task-id given, resolve SPEC_PATH and write inside spec dir; otherwise use /tmp with timestamp
 if [ -n "$TASK_ID" ]; then

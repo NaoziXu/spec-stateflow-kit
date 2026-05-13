@@ -147,8 +147,7 @@ which claude && claude --version
   "WORKSPACE": "{user specified}",
   "DOC_DIR": "{DOC_DIR_name confirmed in Q2, e.g. 'doc'}",
   "CLAUDE_CLI": "{auto-detected or user specified}",
-  "allowed_bash_patterns": [],
-  "worktree": false
+  "allowed_bash_patterns": []
 }
 ```
 
@@ -158,7 +157,6 @@ which claude && claude --version
 | `DOC_DIR` | string | `"doc"` | Spec document directory name (relative to WORKSPACE) |
 | `CLAUDE_CLI` | string | auto-detected | Claude Code CLI path |
 | `allowed_bash_patterns` | string[] | `[]` | Extra Bash allowedTools patterns (e.g. `"gradle build *"`) |
-| `worktree` | bool | `false` | Enable git worktree isolation for spec execution |
 
 > ⚠️ `DOC_DIR` is a **directory name** (e.g. `"doc"`), not a full path. All skills compute the full path as `{WORKSPACE}/{DOC_DIR}` at runtime.
 

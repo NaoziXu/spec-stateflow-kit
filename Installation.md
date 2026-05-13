@@ -122,8 +122,7 @@ After installation, you can manually edit `{SKILLS_DIR}/../spec-env.json`:
   "WORKSPACE": "/your/workspace/path",
   "DOC_DIR": "doc",
   "CLAUDE_CLI": "/your/path/to/claude",
-  "allowed_bash_patterns": [],
-  "worktree": false
+  "allowed_bash_patterns": []
 }
 ```
 
@@ -133,7 +132,6 @@ After installation, you can manually edit `{SKILLS_DIR}/../spec-env.json`:
 | `DOC_DIR` | string | `"doc"` | Spec document directory name (relative to WORKSPACE) |
 | `CLAUDE_CLI` | string | auto-detected | Claude Code CLI path |
 | `allowed_bash_patterns` | string[] | `[]` | Extra Bash allowedTools patterns added to settings.json (e.g. `"gradle build *"`) |
-| `worktree` | bool | `false` | Enable git worktree isolation for spec task execution |
 
 All skills read this file dynamically at runtime; changes take effect immediately. If you edit the claw-side copy (`{SKILLS_DIR}/../spec-env.json`), also update `~/.claude/spec-env.json` to keep both in sync.
 
@@ -360,8 +358,7 @@ spec-stop-anchor.sh  spec-state-guard.sh
   "WORKSPACE": "/your/workspace/path",
   "DOC_DIR": "doc",
   "CLAUDE_CLI": "/your/path/to/claude",
-  "allowed_bash_patterns": [],
-  "worktree": false
+  "allowed_bash_patterns": []
 }
 ```
 
@@ -371,7 +368,6 @@ spec-stop-anchor.sh  spec-state-guard.sh
 | `DOC_DIR` | string | `"doc"` | Spec 文档目录名（相对于 WORKSPACE） |
 | `CLAUDE_CLI` | string | 自动检测 | Claude Code CLI 路径 |
 | `allowed_bash_patterns` | string[] | `[]` | 额外的 Bash allowedTools 规则，写入 settings.json（如 `"gradle build *"`） |
-| `worktree` | bool | `false` | 为 spec 任务执行启用 git worktree 隔离 |
 
 所有技能在运行时动态读取此文件；修改立即生效。如果编辑了 Claw 侧配置（`{SKILLS_DIR}/../spec-env.json`），请同步更新 `~/.claude/spec-env.json`。
 
