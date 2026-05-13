@@ -464,10 +464,21 @@ Branch confirmation (MUST complete before any file changes or git operations):
 0. Validate tasks.md format — ensure every task has a valid status marker [ ]/[~]/[✓]/[⏭]. Fix any missing/invalid markers before proceeding.
 1. Read {SPEC_PATH}/tasks.md → if any [~] task exists, continue it; otherwise find first [ ] task
 2. Mark it [~] → execute per Specifics description
-3. When done: mark [✓], fill Verification, stage changes
-4. Show diff → wait for user review and explicit commit approval (**skipped in [Continuous Operation Mode](#continuous-operation-mode)**)
-5. If user approves: commit → backfill Commit field with actual message + short hash → next task. If user rejects: revert status to [~], address feedback, repeat from step 2
-6. User says "next" → repeat from step 1
+3. After implementation, run the compile command in the Verification field:
+   - If Verification is empty or contains no compile command → STOP; prompt user to provide a compile command before continuing
+   - Compile passes → proceed to step 3a
+   - Compile fails → record failure reason in Notes, fix immediately, retry
+     - Same task fails 3 consecutive times → stop auto-fix; report to user and wait for instructions; do NOT continue
+3a. If the project has automated tests: run the test command in the Verification field:
+   - If Verification has no test command → ask user if there are tests to run; only continue after user confirms no tests are needed
+   - Tests pass → proceed to step 4
+   - Tests fail → same rules as compile failure (record Notes → fix → retry; after 3 failures escalate to user)
+4. Mark task [✓], record Verification result (actual commands run and output summary), stage changes (git add)
+5. Show diff → wait for user review and explicit commit approval (**skipped in [Continuous Operation Mode](#continuous-operation-mode)**)
+6. If user approves: commit → backfill Commit field with actual message + short hash → next task. If user rejects: revert status to [~], address feedback, repeat from step 2
+7. User says "next" → repeat from step 1
+
+**严格禁止 / Strictly prohibited**: Executing git commit while compilation or tests are failing, under any circumstances — including the practice of "commit now, fix in a later task".
 ```
 
 **Session compressed?** Jump to [Compression Recovery](#compression-recovery).
