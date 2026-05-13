@@ -441,6 +441,26 @@ Execute tasks in order from `{SPEC_PATH}/tasks.md`. This phase covers execution 
 First time with a confirmed `tasks.md`:
 
 ```
+Branch confirmation (MUST complete before any file changes or git operations):
+
+   a. Run: git branch --show-current
+   b. Check {SPEC_PATH}/progress.json for working_branch field:
+
+      Case A — working_branch not set (first entry into Phase 4):
+        Display: "Phase 4 will commit to branch: {current_branch}. Confirm? (or specify a different branch)"
+        • User confirms → write working_branch={current_branch} to progress.json (atomic update, preserve other fields) → proceed to step 0
+        • User specifies a different branch → switch to or create that branch → write working_branch → proceed to step 0
+
+      Case B — working_branch already set (compression recovery):
+        If current_branch == working_branch:
+          Display: "Resuming on branch {working_branch} ✓" → proceed to step 0 automatically (no user input needed, no write to progress.json)
+        If current_branch ≠ working_branch:
+          Display: "Warning: recorded branch is {working_branch}, current branch is {current_branch}. Which branch should we continue on?"
+          Wait for user decision → update working_branch in progress.json to the chosen branch → proceed to step 0
+
+   c. Write working_branch to progress.json only when the value changes:
+      Case A: always write; Case B mismatch: write after user decision; Case B match: skip.
+
 0. Validate tasks.md format — ensure every task has a valid status marker [ ]/[~]/[✓]/[⏭]. Fix any missing/invalid markers before proceeding.
 1. Read {SPEC_PATH}/tasks.md → if any [~] task exists, continue it; otherwise find first [ ] task
 2. Mark it [~] → execute per Specifics description
