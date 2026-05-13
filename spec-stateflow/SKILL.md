@@ -65,7 +65,60 @@ Write all natural-language content of requirements.md in DOC_LANG. Technical ter
 
 First complete the requirements design using EARS (Easy Approach to Requirements Syntax) method. You must confirm requirement details with the user. After final confirmation, the requirements are finalized, then proceed to the next phase.
 
-Save to `{SPEC_PATH}/requirements.md`. After confirming with the user, proceed to the next phase.
+Save to `{SPEC_PATH}/requirements.md`.
+
+Before presenting to the user, run a Critic subagent to review quality:
+
+```
+Critic subagent prompt:
+You are reviewing a requirements document for quality. Report findings only — do not rewrite the document.
+
+## Document
+{requirements.md full text}
+
+## Check dimensions
+For each finding, classify as HIGH or MEDIUM.
+
+HIGH (must fix):
+- EARS syntax violation: AC not in "When/While <condition>, the <system name> shall <response>" form
+- Missing AC: a user story has no verifiable acceptance criterion
+- Logical contradiction: user story and AC describe conflicting behavior
+- Unverifiable AC: criterion cannot be objectively tested
+
+MEDIUM (fix if minor):
+- Missing edge case or error path
+- AC could be more specific
+- Missing negative case (what the system shall NOT do)
+
+## Output format
+### HIGH findings
+- [R{n} AC{m}] {description}
+
+### MEDIUM findings
+- [R{n} AC{m}] {description}
+
+### Summary
+HIGH: {count} | MEDIUM: {count}
+```
+
+After receiving Critic findings:
+- **HIGH issues**: fix all of them and update `{SPEC_PATH}/requirements.md`
+- **MEDIUM issues**: fix only those that do not require rewriting an entire section; list the rest in the Critic summary for user decision
+- **No issues found**: skip revision, proceed directly to user confirmation
+- **Critic subagent fails**: continue with the unreviewed draft; note "自动审查已跳过 / Auto-review skipped" in the summary
+
+When presenting requirements.md to the user, append the following Critic summary:
+
+```
+---
+**Requirements Auto-Review Summary**
+- Dimensions checked: EARS syntax, edge case coverage, internal consistency, missing ACs
+- HIGH issues: {n} found, all fixed
+- MEDIUM issues: {n} found, {m} fixed; remaining items for your decision:
+  - [R{n} AC{m}] {description}
+```
+
+After confirming with the user, proceed to the next phase.
 
 **If user rejects or requests changes:** Update requirements.md and re-confirm. Do NOT proceed to Phase 2 until user explicitly approves.
 
